@@ -1,0 +1,19 @@
+name: Build PJ Project
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-ubuntu-default:
+  # checking pure lib source distribution with plain configure & make
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Unzip PJ Project
+      run: unzip ./deps/pjproject-2.14.zip && mv ./deps/pjproject-2.14 ./deps/pjproject && cd ./deps/pjproject
+    - name: configure & make
+      working-directory: ./deps/pjproject
+      run: ./configure && make 
+    - name: Show Build Artifacts
+      working-directory: ./deps/pjproject
+      run: ls -l
