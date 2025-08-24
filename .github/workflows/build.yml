@@ -17,3 +17,31 @@ jobs:
     - name: Show Build Artifacts
       working-directory: ./pjproject-2.14
       run: ls -l
+    - name: Prepare PJSIP bundle
+      run: |
+        mkdir -p ./pjsip-bundle/lib
+        mkdir -p ./pjsip-bundle/include
+        # Copy all static and shared libraries
+        cp ./pjproject-2.14/lib/*.a ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp ./pjproject-2.14/lib/*.so ./pjsip-bundle/lib/ 2>/dev/null || true
+        # Copy all headers
+        cp -r ./pjproject-2.14/include/* ./pjsip-bundle/include/
+        # Optionally copy CLI binary for testing
+        cp ./pjproject-2.14/pjsip-apps/bin/pjsua-* ./pjsip-bundle/ 2>/dev/null || true
+        # Optionally copy third-party libs (example: opus, ssl)
+        cp /usr/lib/x86_64-linux-gnu/libopus.so* ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp /usr/lib/x86_64-linux-gnu/libssl.so* ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp /usr/lib/x86_64-linux-gnu/libcrypto.so* ./pjsip-bundle/lib/ 2>/dev/null || true
+
+    - name: Zip PJSIP bundle
+      run: |
+        cd ./pjsip-bundle
+        zip -r ../pjsip-bundle.zip .
+
+    - name: Upload ZIP to GitHub Release
+      # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./pjsip-bundle.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
