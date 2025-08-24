@@ -21,17 +21,25 @@ jobs:
       run: |
         mkdir -p ./pjsip-bundle/lib
         mkdir -p ./pjsip-bundle/include
-        # Copy all static and shared libraries
-        cp ./pjproject-2.14/lib/*.a ./pjsip-bundle/lib/ 2>/dev/null || true
-        cp ./pjproject-2.14/lib/*.so ./pjsip-bundle/lib/ 2>/dev/null || true
-        # Copy all headers
-        cp -r ./pjproject-2.14/include/* ./pjsip-bundle/include/
+        # Copy all static and shared libraries and headers from pjlib, pjsip, pjnath, pjmedia
+        cp ./pjproject-2.14/pjlib/lib/*.a ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjlib/lib/*.so ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp -r ./pjproject-2.14/pjlib/include/* ./pjsip-bundle/include/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjsip/lib/*.a ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjsip/lib/*.so ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp -r ./pjproject-2.14/pjsip/include/* ./pjsip-bundle/include/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjnath/lib/*.a ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjnath/lib/*.so ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp -r ./pjproject-2.14/pjnath/include/* ./pjsip-bundle/include/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjmedia/lib/*.a ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp ./pjproject-2.14/pjmedia/lib/*.so ./pjsip-bundle/lib/ 2>/dev/null || true
+        cp -r ./pjproject-2.14/pjmedia/include/* ./pjsip-bundle/include/ 2>/dev/null || true
         # Optionally copy CLI binary for testing
         cp ./pjproject-2.14/pjsip-apps/bin/pjsua-* ./pjsip-bundle/ 2>/dev/null || true
         # Optionally copy third-party libs (example: opus, ssl)
-        cp /usr/lib/x86_64-linux-gnu/libopus.so* ./pjsip-bundle/lib/ 2>/dev/null || true
-        cp /usr/lib/x86_64-linux-gnu/libssl.so* ./pjsip-bundle/lib/ 2>/dev/null || true
-        cp /usr/lib/x86_64-linux-gnu/libcrypto.so* ./pjsip-bundle/lib/ 2>/dev/null || true
+        # cp /usr/lib/x86_64-linux-gnu/libopus.so* ./pjsip-bundle/lib/ 2>/dev/null || true
+        # cp /usr/lib/x86_64-linux-gnu/libssl.so* ./pjsip-bundle/lib/ 2>/dev/null || true
+        # cp /usr/lib/x86_64-linux-gnu/libcrypto.so* ./pjsip-bundle/lib/ 2>/dev/null || true
 
     - name: Zip PJSIP bundle
       run: |
