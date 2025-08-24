@@ -41,15 +41,22 @@ jobs:
         # cp /usr/lib/x86_64-linux-gnu/libssl.so* ./pjsip-bundle/lib/ 2>/dev/null || true
         # cp /usr/lib/x86_64-linux-gnu/libcrypto.so* ./pjsip-bundle/lib/ 2>/dev/null || true
 
+    - name: Read VERSION
+      id: version
+      uses: juliangruber/read-file-action@v1
+      with:
+        path: ./VERSION
+
     - name: Zip PJSIP bundle
       run: |
         cd ./pjsip-bundle
-        zip -r ../pjsip-bundle.zip .
+        zip -r ../pjsip-bundle-{{ steps.version.outputs.content }}.zip .
 
     - name: Upload ZIP to GitHub Release
       # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
-        files: ./pjsip-bundle.zip
+        tag_name: 'v${{ steps.version.outputs.content }}'
+        files: ./pjsip-bundle-{{ steps.version.outputs.content }}.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
