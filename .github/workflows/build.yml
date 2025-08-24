@@ -10,10 +10,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Unzip PJ Project
-      run: unzip .pjproject-2.14.zip
+      run: unzip ./pjproject-2.14.zip
     - name: configure & make
-      working-directory: ./deps/pjproject-2.14
+      working-directory: ./pjproject-2.14
       run: ./configure && make 
     - name: Show Build Artifacts
-      working-directory: ./deps/pjproject-2.14
+      working-directory: ./pjproject-2.14
       run: ls -l
