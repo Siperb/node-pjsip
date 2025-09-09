@@ -1,0 +1,29 @@
+{
+  "name": "node-pjsip",
+  "version": "0.1.0",
+  "description": "Node.js bindings for the PJSIP SIP stack (GPL-2.0)",
+  "main": "lib/index.js",
+  "scripts": {
+    "install": "node-gyp rebuild"
+  },
+  "gypfile": true,
+  "keywords": [
+    "sip",
+    "voip",
+    "pjsip",
+    "webrtc",
+    "telephony"
+  ],
+  "license": "GPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Siperb/node-pjsip.git"
+  },
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^8.3.1"
+  },
+  "devDependencies": {
+    "node-gyp": "^11.3.0"
+  }
+}
