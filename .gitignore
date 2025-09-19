@@ -422,7 +422,6 @@ dist/
 out/
 
 # Development files
-build.js
 main.js
 run-electron.bat
 run-electron.js
