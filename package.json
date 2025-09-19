@@ -4,7 +4,15 @@
   "description": "Node.js bindings for the PJSIP SIP stack (GPL-2.0)",
   "main": "lib/index.js",
   "scripts": {
-    "install": "node-gyp rebuild"
+    "install": "node-gyp rebuild",
+    "build": "node build.js",
+    "rebuild": "node-gyp rebuild",
+    "clean": "node-gyp clean",
+    "test": "node test.js",
+    "start": "node test.js",
+    "electron": "electron main.js",
+    "electron-dev": "electron main.js --dev",
+    "build-and-run": "npm run build && npm run electron"
   },
   "gypfile": true,
   "keywords": [
@@ -24,6 +32,7 @@
     "node-addon-api": "^8.3.1"
   },
   "devDependencies": {
+    "electron": "^38.1.0",
     "node-gyp": "^11.3.0"
   }
 }
