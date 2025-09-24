@@ -580,6 +580,41 @@ jobs:
             $objFiles = Get-ChildItem -Path $rootDir -Filter "*.obj" -Recurse
             Write-Host "Found $($objFiles.Count) .obj files"
             
+            # Set up Visual Studio environment for lib.exe
+            Write-Host "Setting up Visual Studio environment for lib.exe..."
+            $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+            if (Test-Path $vsPath) {
+              Write-Host "Found Visual Studio 2022 Enterprise"
+              cmd /c "`"$vsPath`" && set" | ForEach-Object {
+                if ($_ -match "^([^=]+)=(.*)$") {
+                  [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+                }
+              }
+            } else {
+              # Try Community edition
+              $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+              if (Test-Path $vsPath) {
+                Write-Host "Found Visual Studio 2022 Community"
+                cmd /c "`"$vsPath`" && set" | ForEach-Object {
+                  if ($_ -match "^([^=]+)=(.*)$") {
+                    [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+                  }
+                }
+              } else {
+                Write-Host "ERROR: Visual Studio not found. Cannot create libraries."
+                exit 1
+              }
+            }
+            
+            # Verify lib.exe is available
+            $libExe = Get-Command "lib.exe" -ErrorAction SilentlyContinue
+            if (-not $libExe) {
+              Write-Host "ERROR: lib.exe not found in PATH after setting up Visual Studio environment"
+              Write-Host "Current PATH: $env:PATH"
+              exit 1
+            }
+            Write-Host "lib.exe found at: $($libExe.Source)"
+            
             # Group .obj files by their parent directory to create individual libraries
             $objGroups = $objFiles | Group-Object { $_.Directory.Name }
             
