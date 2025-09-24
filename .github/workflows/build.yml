@@ -34,29 +34,136 @@ jobs:
 
       - name: Unzip PJ Project
         run: |
+          Write-Host "Starting PJSIP extraction..."
+          Write-Host "Archive file: pjproject-${{ env.SRC_VERSION }}.zip"
+          if (Test-Path "pjproject-${{ env.SRC_VERSION }}.zip") {
+            Write-Host "Archive file exists, size:"
+            Get-Item "pjproject-${{ env.SRC_VERSION }}.zip" | Select-Object Name, Length
+          } else {
+            Write-Host "ERROR: Archive file not found!"
+            exit 1
+          }
+          
+          Write-Host "Extracting archive..."
           Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force
-          Write-Host "Checking extracted contents..."
+          
+          Write-Host "=== ROOT DIRECTORY CONTENTS ==="
           dir
-          Write-Host "Checking pjproject directory structure..."
+          
+          Write-Host "=== CHECKING FOR PJPROJECT DIRECTORY ==="
           if (Test-Path "pjproject-${{ env.SRC_VERSION }}") {
             Write-Host "pjproject-${{ env.SRC_VERSION }} directory found"
+            Write-Host "=== PJPROJECT DIRECTORY CONTENTS ==="
             dir "pjproject-${{ env.SRC_VERSION }}"
-            Write-Host "Checking for required subdirectories..."
+            
+            Write-Host "=== CHECKING FOR PJLIB DIRECTORY ==="
             if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjlib") {
               Write-Host "pjlib directory found"
+              Write-Host "=== PJLIB DIRECTORY CONTENTS ==="
+              dir "pjproject-${{ env.SRC_VERSION }}/pjlib"
+              
+              Write-Host "=== CHECKING FOR PJLIB.VCXPROJ ==="
+              if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjlib/pjlib.vcxproj") {
+                Write-Host "pjlib.vcxproj found!"
+              } else {
+                Write-Host "ERROR: pjlib.vcxproj not found in pjlib directory"
+                Write-Host "Looking for any .vcxproj files in pjlib:"
+                Get-ChildItem "pjproject-${{ env.SRC_VERSION }}/pjlib" -Filter "*.vcxproj" -Recurse
+                exit 1
+              }
             } else {
               Write-Host "ERROR: pjlib directory not found in extracted archive"
+              Write-Host "Looking for any pjlib directories:"
+              Get-ChildItem -Recurse -Directory -Name "*pjlib*"
               exit 1
             }
+            
+            Write-Host "=== CHECKING FOR PJSIP DIRECTORY ==="
             if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjsip") {
               Write-Host "pjsip directory found"
+              Write-Host "=== PJSIP DIRECTORY CONTENTS ==="
+              dir "pjproject-${{ env.SRC_VERSION }}/pjsip"
             } else {
               Write-Host "ERROR: pjsip directory not found in extracted archive"
+              Write-Host "Looking for any pjsip directories:"
+              Get-ChildItem -Recurse -Directory -Name "*pjsip*"
               exit 1
             }
+            
+            Write-Host "=== CHECKING FOR ALL .VCXPROJ FILES ==="
+            Write-Host "All .vcxproj files found:"
+            Get-ChildItem -Recurse -Filter "*.vcxproj" | Select-Object FullName
+            
           } else {
             Write-Host "ERROR: pjproject-${{ env.SRC_VERSION }} directory not found after extraction"
+            Write-Host "Looking for any directories containing 'pjproject':"
+            Get-ChildItem -Directory -Name "*pjproject*"
             exit 1
+          }
+          
+          Write-Host "PJSIP extraction and validation completed successfully"
+        shell: powershell
+
+      - name: Fix nested directory structure (if needed)
+        run: |
+          Write-Host "Checking for nested directory structure..."
+          $pjprojectDir = "pjproject-${{ env.SRC_VERSION }}"
+          
+          # Check if we have a nested structure like pjproject-2.15.1/pjproject-2.15.1/
+          if (Test-Path "$pjprojectDir/$pjprojectDir") {
+            Write-Host "Nested directory structure detected: $pjprojectDir/$pjprojectDir"
+            Write-Host "Contents of nested directory:"
+            dir "$pjprojectDir/$pjprojectDir"
+            
+            # Check if the nested directory has the actual source files
+            if (Test-Path "$pjprojectDir/$pjprojectDir/pjlib") {
+              Write-Host "Moving contents from nested directory to parent..."
+              # Move all contents from nested to parent, excluding the nested directory itself
+              Get-ChildItem "$pjprojectDir/$pjprojectDir" | Move-Item -Destination "$pjprojectDir/" -Force
+              Write-Host "Contents moved successfully"
+              Write-Host "New structure:"
+              dir "$pjprojectDir"
+            }
+          }
+          
+          # Final verification
+          Write-Host "=== FINAL VERIFICATION ==="
+          if (Test-Path "$pjprojectDir/pjlib/pjlib.vcxproj") {
+            Write-Host "SUCCESS: pjlib.vcxproj found at correct location"
+          } else {
+            Write-Host "ERROR: pjlib.vcxproj still not found after structure fix"
+            Write-Host "Available .vcxproj files:"
+            Get-ChildItem -Recurse -Filter "*.vcxproj" | Select-Object FullName
+            
+            Write-Host "=== ATTEMPTING ALTERNATIVE STRUCTURE FIX ==="
+            # Look for any directory that contains pjlib
+            $pjlibDirs = Get-ChildItem -Recurse -Directory -Name "*pjlib*"
+            Write-Host "Found pjlib directories: $pjlibDirs"
+            
+            # Look for any .vcxproj files
+            $vcxprojFiles = Get-ChildItem -Recurse -Filter "*.vcxproj"
+            Write-Host "Found .vcxproj files:"
+            $vcxprojFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
+            
+            # Try to find the correct root directory
+            $possibleRoots = Get-ChildItem -Directory | Where-Object { 
+              Test-Path "$($_.Name)/pjlib/pjlib.vcxproj" 
+            }
+            
+            if ($possibleRoots.Count -gt 0) {
+              Write-Host "Found possible root directories with pjlib.vcxproj:"
+              $possibleRoots | ForEach-Object { Write-Host "  $($_.Name)" }
+              
+              # Use the first valid root
+              $correctRoot = $possibleRoots[0].Name
+              Write-Host "Using root directory: $correctRoot"
+              
+              # Update the environment variable for subsequent steps
+              Write-Host "CORRECT_ROOT_DIR=$correctRoot" >> $env:GITHUB_ENV
+            } else {
+              Write-Host "ERROR: No valid root directory found with pjlib.vcxproj"
+              exit 1
+            }
           }
         shell: powershell
 
@@ -222,14 +329,14 @@ jobs:
             }
           }
         shell: powershell
-        working-directory: pjproject-${{ env.SRC_VERSION }}
+        working-directory: ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}
 
       - name: check VsDevCmd.bat
         run: dir "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
         shell: cmd
 
       - name: Clean previous builds
-        working-directory: pjproject-${{ env.SRC_VERSION }}
+        working-directory: ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Cleaning previous build artifacts manually"
@@ -245,7 +352,7 @@ jobs:
         shell: cmd
 
       - name: Build PJSIP libraries
-        working-directory: pjproject-${{ env.SRC_VERSION }}
+        working-directory: ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Building PJSIP libraries for Node.js addon..."
@@ -350,36 +457,36 @@ jobs:
           mkdir pjsip-bundle\lib
           mkdir pjsip-bundle\include
           echo "Copying header files..."
-          if exist "pjproject-${{ env.SRC_VERSION }}\pjlib\include" (
-            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjlib\include pjsip-bundle\include\pjlib
+          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjlib\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjlib\include pjsip-bundle\include\pjlib
           ) else (
             echo "WARNING: pjlib\include not found"
           )
-          if exist "pjproject-${{ env.SRC_VERSION }}\pjsip\include" (
-            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjsip\include pjsip-bundle\include\pjsip
+          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjsip\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjsip\include pjsip-bundle\include\pjsip
           ) else (
             echo "WARNING: pjsip\include not found"
           )
-          if exist "pjproject-${{ env.SRC_VERSION }}\pjnath\include" (
-            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjnath\include pjsip-bundle\include\pjnath
+          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjnath\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjnath\include pjsip-bundle\include\pjnath
           ) else (
             echo "WARNING: pjnath\include not found"
           )
-          if exist "pjproject-${{ env.SRC_VERSION }}\pjmedia\include" (
-            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjmedia\include pjsip-bundle\include\pjmedia
+          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjmedia\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjmedia\include pjsip-bundle\include\pjmedia
           ) else (
             echo "WARNING: pjmedia\include not found"
           )
           echo "Copying library files..."
-          if exist "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" (
-            xcopy /Y pjproject-${{ env.SRC_VERSION }}\lib\*.lib pjsip-bundle\lib\
+          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib\*.lib" (
+            xcopy /Y ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib\*.lib pjsip-bundle\lib\
             echo "Library files copied successfully"
             dir pjsip-bundle\lib\*.lib
           ) else (
-            echo "WARNING: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
-            echo "Available files in pjproject-${{ env.SRC_VERSION }}\lib:"
-            if exist "pjproject-${{ env.SRC_VERSION }}\lib" (
-              dir pjproject-${{ env.SRC_VERSION }}\lib
+            echo "WARNING: No .lib files found in ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib"
+            echo "Available files in ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib:"
+            if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib" (
+              dir ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib
             ) else (
               echo "lib directory does not exist"
             )
@@ -396,20 +503,24 @@ jobs:
           npm ci
           # Copy PJSIP libraries to expected location for Node addon build
           Write-Host "Copying PJSIP libraries for Node addon build"
-          if (Test-Path "pjproject-${{ env.SRC_VERSION }}\lib") {
-            $libFiles = Get-ChildItem "pjproject-${{ env.SRC_VERSION }}\lib\*.lib"
+          $rootDir = "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}"
+          Write-Host "Using root directory: $rootDir"
+          if (Test-Path "$rootDir\lib") {
+            $libFiles = Get-ChildItem "$rootDir\lib\*.lib"
             if ($libFiles.Count -gt 0) {
-              Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" -Destination "." -Force
+              Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
               Write-Host "PJSIP libraries copied successfully:"
               Get-ChildItem "*.lib" | Select-Object Name, Length
             } else {
-              Write-Host "ERROR: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
-              Write-Host "Available files in pjproject-${{ env.SRC_VERSION }}\lib:"
-              Get-ChildItem "pjproject-${{ env.SRC_VERSION }}\lib"
+              Write-Host "ERROR: No .lib files found in $rootDir\lib"
+              Write-Host "Available files in $rootDir\lib:"
+              Get-ChildItem "$rootDir\lib"
               exit 1
             }
           } else {
-            Write-Host "ERROR: pjproject-${{ env.SRC_VERSION }}\lib directory does not exist"
+            Write-Host "ERROR: $rootDir\lib directory does not exist"
+            Write-Host "Available directories:"
+            Get-ChildItem -Directory
             exit 1
           }
           
