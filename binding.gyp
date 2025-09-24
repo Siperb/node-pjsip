@@ -8,12 +8,12 @@
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
-        "pjproject-2.15.1/pjproject-2.15.1/pjlib/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjlib-util/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjmedia/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjnath/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjsip/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjsip-apps/src/pjsua"
+        "pjproject-2.15.1/pjlib/include",
+        "pjproject-2.15.1/pjlib-util/include",
+        "pjproject-2.15.1/pjmedia/include",
+        "pjproject-2.15.1/pjnath/include",
+        "pjproject-2.15.1/pjsip/include",
+        "pjproject-2.15.1/pjsip-apps/src/pjsua"
       ],
       "conditions": [
         ["OS=='win'", {
@@ -26,7 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "<!(node -e \"const fs=require('fs'); const path=require('path'); const arch = process.arch === 'x64' ? 'x86_64-x64' : 'i386-Win32'; const libPath = 'pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-' + arch + '-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found: ' + libPath); process.exit(1); }\")"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const arch = process.arch === 'x64' ? 'x86_64-x64' : 'i386-Win32'; const libPath = 'pjproject-2.15.1/lib/libpjproject-' + arch + '-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found: ' + libPath); process.exit(1); }\")"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -40,7 +40,7 @@
         }],
         ["OS=='mac'", {
           "libraries": [
-            "<!(node -e \"const fs=require('fs'); const path=require('path'); const arch = process.arch === 'x64' ? 'x86_64-x64' : 'i386-Win32'; const libPath = 'pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-' + arch + '-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found: ' + libPath); process.exit(1); }\")"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const arch = process.arch === 'x64' ? 'x86_64-x64' : 'i386-Win32'; const libPath = 'pjproject-2.15.1/lib/libpjproject-' + arch + '-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found: ' + libPath); process.exit(1); }\")"
           ],
           "xcode_settings": {
             "MACOSX_DEPLOYMENT_TARGET": "15.0",
