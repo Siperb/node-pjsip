@@ -27,14 +27,36 @@ jobs:
         shell: powershell
 
       - name: get openssl
-        run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1q.zip" -OutFile ".\openssl.zip"
+        run: |
+          try {
+            Invoke-WebRequest -Uri "https://slproweb.com/download/Win64OpenSSL_Light-1_1_1q.exe" -OutFile ".\openssl-installer.exe"
+            if (!(Test-Path ".\openssl-installer.exe")) {
+              Write-Error "OpenSSL download failed"
+              exit 1
+            }
+            Write-Host "OpenSSL downloaded successfully"
+          } catch {
+            Write-Error "Failed to download OpenSSL: $_"
+            exit 1
+          }
         shell: powershell
 
-      - name: expand openssl
+      - name: install openssl
         run: |
-          Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
-          cd openssl_build\openssl-1.1\x86
-          Add-Content ..\..\..\openssl_dir.txt $pwd.Path
+          try {
+            # Extract OpenSSL installer silently
+            Start-Process -FilePath ".\openssl-installer.exe" -ArgumentList "/SILENT", "/DIR=C:\openssl" -Wait
+            if (Test-Path "C:\openssl") {
+              Add-Content openssl_dir.txt "C:\openssl"
+              Write-Host "OpenSSL installed to C:\openssl"
+            } else {
+              Write-Error "OpenSSL installation failed"
+              exit 1
+            }
+          } catch {
+            Write-Error "Failed to install OpenSSL: $_"
+            exit 1
+          }
         shell: powershell
 
       - name: check openssl folder
@@ -45,14 +67,36 @@ jobs:
         shell: cmd
 
       - name: get libvpx
-        run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/libvpx/releases/download/v1.8.2/libvpx_v1.8.2_msvc14.zip" -Outfile "libvpx.zip"
+        run: |
+          try {
+            Invoke-WebRequest -Uri "https://github.com/webmproject/libvpx/archive/v1.13.0.zip" -Outfile "libvpx.zip"
+            if (!(Test-Path "libvpx.zip")) {
+              Write-Error "libvpx download failed"
+              exit 1
+            }
+            Write-Host "libvpx downloaded successfully"
+          } catch {
+            Write-Error "Failed to download libvpx: $_"
+            exit 1
+          }
         shell: powershell
 
       - name: expand libvpx
         run: |
-          Expand-Archive -LiteralPath .\libvpx.zip -DestinationPath .\libvpx_build\; pwd
-          cd libvpx_build
-          Add-Content ..\libvpx_dir.txt $pwd.Path
+          try {
+            Expand-Archive -LiteralPath .\libvpx.zip -DestinationPath .\libvpx_build\ -Force
+            if (Test-Path ".\libvpx_build") {
+              cd libvpx_build
+              Add-Content ..\libvpx_dir.txt $pwd.Path
+              Write-Host "libvpx extracted successfully"
+            } else {
+              Write-Error "libvpx extraction failed"
+              exit 1
+            }
+          } catch {
+            Write-Error "Failed to extract libvpx: $_"
+            exit 1
+          }
         shell: powershell
 
       - name: check libvpx folder
@@ -63,14 +107,36 @@ jobs:
         shell: cmd
 
       - name: get libsdl
-        run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/SDL/releases/download/release-2.0.9/libsdl_release-2.0.9_msvc14.zip" -Outfile ".\libsdl.zip"
+        run: |
+          try {
+            Invoke-WebRequest -Uri "https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-devel-2.28.5-VC.zip" -Outfile ".\libsdl.zip"
+            if (!(Test-Path ".\libsdl.zip")) {
+              Write-Error "SDL download failed"
+              exit 1
+            }
+            Write-Host "SDL downloaded successfully"
+          } catch {
+            Write-Error "Failed to download SDL: $_"
+            exit 1
+          }
         shell: powershell
 
       - name: expand libsdl
         run: |
-          Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
-          cd libsdl_build
-          Add-Content ..\libsdl_dir.txt $pwd.Path
+          try {
+            Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\ -Force
+            if (Test-Path ".\libsdl_build") {
+              cd libsdl_build
+              Add-Content ..\libsdl_dir.txt $pwd.Path
+              Write-Host "SDL extracted successfully"
+            } else {
+              Write-Error "SDL extraction failed"
+              exit 1
+            }
+          } catch {
+            Write-Error "Failed to extract SDL: $_"
+            exit 1
+          }
         shell: powershell
 
       - name: check libsdl folder
