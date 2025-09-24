@@ -575,7 +575,7 @@ jobs:
             Get-ChildItem "*.lib" | Select-Object Name, Length
           } else {
             Write-Host "ERROR: No .lib files found anywhere in $rootDir"
-            Write-Host "Available files in $rootDir:"
+            Write-Host "Available files in ${rootDir}:"
             Get-ChildItem -Path $rootDir -Recurse | Where-Object { $_.Extension -eq ".lib" -or $_.Extension -eq ".obj" -or $_.Extension -eq ".exe" }
             exit 1
           }
