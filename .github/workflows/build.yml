@@ -379,7 +379,7 @@ jobs:
             echo "All .vcxproj files in current directory:"
             dir *.vcxproj /s
             echo "Looking for solution files:"
-            dir *.sln
+          dir *.sln
             echo "Checking if we should use solution files instead..."
             if exist "pjproject-vs14.sln" (
               echo "Found pjproject-vs14.sln - will use solution file for building"
@@ -574,10 +574,53 @@ jobs:
             Write-Host "PJSIP libraries copied to current directory:"
             Get-ChildItem "*.lib" | Select-Object Name, Length
           } else {
-            Write-Host "ERROR: No .lib files found anywhere in $rootDir"
-            Write-Host "Available files in ${rootDir}:"
-            Get-ChildItem -Path $rootDir -Recurse | Where-Object { $_.Extension -eq ".lib" -or $_.Extension -eq ".obj" -or $_.Extension -eq ".exe" }
-            exit 1
+            Write-Host "No .lib files found, but found .obj files. Creating libraries from object files..."
+            
+            # Find all .obj files and create libraries from them
+            $objFiles = Get-ChildItem -Path $rootDir -Filter "*.obj" -Recurse
+            Write-Host "Found $($objFiles.Count) .obj files"
+            
+            # Group .obj files by their parent directory to create individual libraries
+            $objGroups = $objFiles | Group-Object { $_.Directory.Name }
+            
+            foreach ($group in $objGroups) {
+              $libName = $group.Name + ".lib"
+              $libPath = Join-Path "$rootDir\lib" $libName
+              Write-Host "Creating library: $libName from $($group.Count) object files"
+              
+              # Use lib.exe to create library from object files
+              $objPaths = $group.Group | ForEach-Object { "`"$($_.FullName)`"" }
+              $libCmd = "lib.exe /OUT:`"$libPath`" " + ($objPaths -join " ")
+              Write-Host "Running: $libCmd"
+              
+              try {
+                Invoke-Expression $libCmd
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "Successfully created: $libName"
+                } else {
+                  Write-Host "Failed to create: $libName"
+                }
+              } catch {
+                Write-Host "Error creating $libName : $($_.Exception.Message)"
+              }
+            }
+            
+            # Check if we now have .lib files
+            $newLibFiles = Get-ChildItem -Path "$rootDir\lib" -Filter "*.lib"
+            if ($newLibFiles.Count -gt 0) {
+              Write-Host "Successfully created $($newLibFiles.Count) libraries:"
+              $newLibFiles | ForEach-Object { Write-Host "  $($_.Name)" }
+              
+              # Copy to current directory for node-gyp
+              Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
+              Write-Host "PJSIP libraries copied to current directory:"
+              Get-ChildItem "*.lib" | Select-Object Name, Length
+            } else {
+              Write-Host "ERROR: Still no .lib files found after creation attempt"
+              Write-Host "Available files in ${rootDir}:"
+              Get-ChildItem -Path $rootDir -Recurse | Where-Object { $_.Extension -eq ".lib" -or $_.Extension -eq ".obj" -or $_.Extension -eq ".exe" }
+              exit 1
+            }
           }
           
           Write-Host "Running node-gyp configure..."
