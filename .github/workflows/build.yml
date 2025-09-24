@@ -113,23 +113,10 @@ jobs:
           xcopy /Y pjproject-${{ env.SRC_VERSION }}\pjmedia\lib\*.lib pjsip-bundle\lib\
         shell: cmd
 
-      - name: Read VERSION
-        id: version
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ./VERSION
-
       - name: Zip PJSIP bundle
         run: |
           powershell -Command "Compress-Archive -Path .\pjsip-bundle\* -DestinationPath .\pjsip-windows.x64.zip -Force"
-
-      - name: Upload ZIP to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: 'v${{ steps.version.outputs.content }}'
-          files: ./pjsip-windows.x64.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          Write-Host "PJSIP bundle zipped successfully"
 
       - name: Build Node addon
         run: |
@@ -137,11 +124,12 @@ jobs:
           npm run build
         shell: powershell
 
-      - name: Upload Node addon artifact
+      - name: Upload all artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: node-addon-windows-x64
+          name: pjsip-node-windows-x64
           path: |
             build/Release/*.node
             dist/**
+            pjsip-windows.x64.zip
           if-no-files-found: error
