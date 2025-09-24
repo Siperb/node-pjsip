@@ -411,6 +411,7 @@ FodyWeavers.xsd
 /deps
 
 # PJSIP source code (large binary files)
+pjproject-2.15.1/
 
 # Node.js
 node_modules/
