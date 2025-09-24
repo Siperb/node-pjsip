@@ -12,7 +12,8 @@
         "pjproject-2.15.1/pjproject-2.15.1/pjlib-util/include",
         "pjproject-2.15.1/pjproject-2.15.1/pjmedia/include",
         "pjproject-2.15.1/pjproject-2.15.1/pjnath/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjsip/include"
+        "pjproject-2.15.1/pjproject-2.15.1/pjsip/include",
+        "pjproject-2.15.1/pjproject-2.15.1/pjsip-apps/src/pjsua"
       ],
       "conditions": [
         ["OS=='win'", {
@@ -25,7 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
+            "<!(node -e \"console.log(require('path').resolve('pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib'))\")"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -39,7 +40,7 @@
         }],
         ["OS=='mac'", {
           "libraries": [
-            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
+            "<!(node -e \"console.log(require('path').resolve('pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib'))\")"
           ],
           "xcode_settings": {
             "MACOSX_DEPLOYMENT_TARGET": "15.0",
