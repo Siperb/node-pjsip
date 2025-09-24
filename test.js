@@ -1,59 +1,111 @@
-const PJ_SIP = require('./lib');
+const PJSIP = require('./lib');
 
-let session = {
-  Id: 0,                    // This Session ID is in sync with webview Session ID
-  Direction: 'inbound',
-  State: 'active',
-  PjSipSession:null
-}
-let Sessions = []; 
+// Create PJSIP instance
+const pjsip = new PJSIP.PJSIP();
 
-// Methods To Handle PJ SIP
-PJ_SIP.Init();
+// Real SIP configuration - Replace with your actual SIP details
+const sipConfig = {
+    aor: "sip:1113@pbx.sheerbit.com",           // Your SIP address
+    registrar: "sip:pbx.sheerbit.com:5060",        // Your registrar server
+    username: "1113",                     // Your SIP username
+    password: "JJ5iYgLcermrMu",                     // Your SIP password
+    proxy: "sip:devproxy.celloip.com"                                      // Optional proxy server
+};
 
-// PJ_SIP.RegisterAccount({
-//   aor: "sip:yAS43lAg8L@innovateasterisk.com",
-//   registrar: 'sip:yAS43lAg8L@172.31.28.116:5060',
-//   username: 'yAS43lAg8L',
-//   password: '123456',
-//   protocol: 'UDP'
-// });
+// Event handlers
+pjsip.on('initialized', (data) => {
+    console.log('✅ PJSIP initialized:', data);
+    
+    // Add account after initialization
+    try {
+        const accountId = pjsip.addAccount(sipConfig);
+        
+        console.log('✅ Account added with ID:', accountId);
+        
+        // Register the account
+        pjsip.registerAccount(accountId);
+        
+    } catch (error) {
+        console.error('❌ Error adding account:', error.message);
+    }
+});
 
-// let PjSipSession = PJ_SIP.Invite({
-//   to: 'sip:conrad@innovateasterisk.com',
-//   withVideo: false,
-// });
+pjsip.on('accountAdded', (data) => {
+    console.log('✅ Account added:', data);
+});
 
-// PJ_SIP.SetActiveSession(PjSipSession);
+pjsip.on('registrationStarted', (data) => {
+    console.log('🔄 Registration started for account:', data.accountId);
+});
 
-// PJ_SIP.CancelInvite(PjSipSession);
-// PJ_SIP.DeclineInvite(PjSipSession);
-// PJ_SIP.EndSession(PjSipSession);
+// Add registration success/failure handlers
+pjsip.on('registered', (aor) => {
+    console.log('✅ Registration successful for:', aor);
+});
 
-/// PJ_SIP.Mute(PjSipSession);
-// PJ_SIP.Unmute(PjSipSession);
-// PJ_SIP.Hold(PjSipSession);
-// PJ_SIP.Unhold(PjSipSession);
+pjsip.on('registerFailed', (aor) => {
+    console.log('❌ Registration failed for:', aor);
+});
 
-// PJ_SIP.Shutdown();
+pjsip.on('unregistered', (aor) => {
+    console.log('📤 Unregistered:', aor);
+});
 
-// Events to respond to PJ SIP events
-// PJ_SIP.on('Registered', (data) => {
-//   console.log('Registered:', data);
-// });
-// PJ_SIP.on('RegisterFailed', (data) => {
-//   console.log('Register Failed:', data);
-// });
-// PJ_SIP.on('Unregistered', (data) => {
-//   console.log('Unregistered:', data);
-// });
+pjsip.on('error', (error) => {
+    console.error('❌ PJSIP Error:', error);
+});
 
-// PJ_SIP.on('IncomingInvite', (data) => {
-//   console.log('Incoming Invite:', data);
-// });
-// PJ_SIP.on('SessionStateChange', (data) => {
-//   console.log('Session State:', data);
-// });
-// PJ_SIP.on('Message', (data) => {
-//   console.log('Message:', data);
-// });
+// Initialize PJSIP
+console.log('🚀 Initializing PJSIP...');
+pjsip.init().then((result) => {
+    console.log('✅ Initialization result:', result);
+}).catch((error) => {
+    console.error('❌ Initialization failed:', error);
+});
+
+// Keep the process running to see registration events
+setTimeout(() => {
+    console.log('\n📊 Current accounts:');
+    const accounts = pjsip.getAccounts();
+    accounts.forEach(account => {
+        console.log(`  Account ${account.id}: ${account.aor} (Registered: ${account.isRegistered})`);
+    });
+    
+    // Get detailed account info
+    if (accounts.length > 0) {
+        const accountId = accounts[0].id;
+        try {
+            const info = pjsip.getAccountInfo(accountId);
+            console.log('\n📋 Account details:', info);
+        } catch (error) {
+            console.error('❌ Error getting account info:', error.message);
+        }
+    }
+}, 3000);
+
+// Graceful shutdown after 10 seconds
+setTimeout(() => {
+    console.log('\n🛑 Shutting down PJSIP...');
+    pjsip.shutdown().then((result) => {
+        console.log('✅ Shutdown result:', result);
+        process.exit(0);
+    }).catch((error) => {
+        console.error('❌ Shutdown failed:', error);
+        process.exit(1);
+    });
+}, 10000);
+
+// Handle process termination
+process.on('SIGINT', () => {
+    console.log('\n🛑 Received SIGINT, shutting down...');
+    pjsip.shutdown().then(() => {
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Received SIGTERM, shutting down...');
+    pjsip.shutdown().then(() => {
+        process.exit(0);
+    });
+});
