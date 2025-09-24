@@ -65,21 +65,14 @@ jobs:
       - name: Verify PJSIP directory structure
         run: |
           Write-Host "Checking if PJSIP directory exists..."
+          Write-Host "Current directory contents:"
+          dir
+          Write-Host "Checking for pjproject-${{ env.SRC_VERSION }} directory..."
           if (Test-Path "pjproject-${{ env.SRC_VERSION }}") {
-            Write-Host "✓ pjproject-${{ env.SRC_VERSION }} directory found"
-            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}") {
-              Write-Host "✓ Nested pjproject directory found"
-              Write-Host "Directory contents:"
-              dir "pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}"
-            } else {
-              Write-Host "✗ Nested pjproject directory not found"
-              Write-Host "Available in pjproject-${{ env.SRC_VERSION }}:"
-              dir "pjproject-${{ env.SRC_VERSION }}"
-            }
+            Write-Host "pjproject-${{ env.SRC_VERSION }} directory found"
+            dir "pjproject-${{ env.SRC_VERSION }}"
           } else {
-            Write-Host "✗ pjproject-${{ env.SRC_VERSION }} directory not found"
-            Write-Host "Current directory contents:"
-            dir
+            Write-Host "pjproject-${{ env.SRC_VERSION }} directory not found"
           }
         shell: powershell
 
@@ -89,35 +82,33 @@ jobs:
           pwd
           Write-Host "Checking for pjlib directory..."
           if (Test-Path "pjlib/include/pj") {
-            Write-Host "✓ pjlib/include/pj found"
+            Write-Host "pjlib/include/pj found"
             cd pjlib/include/pj
             if (Test-Path "config_site_test.h") {
               cp config_site_test.h config_site.h
-              Write-Host "✓ config_site.h created from config_site_test.h"
+              Write-Host "config_site.h created from config_site_test.h"
             } else {
-              Write-Host "✗ config_site_test.h not found"
+              Write-Host "config_site_test.h not found, creating empty config_site.h"
               New-Item -ItemType File -Name "config_site.h" -Force
-              Write-Host "✓ Empty config_site.h created"
             }
+            Write-Host "Configuring PJSIP for minimal build (audio only, no SSL/SRTP)"
+            Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+            Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+            Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+            Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+            Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+            Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+            Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
           } else {
-            Write-Host "✗ pjlib/include/pj not found"
+            Write-Host "pjlib/include/pj not found"
             Write-Host "Available directories:"
             dir
             exit 1
           }
-          # Minimal configuration - audio only, no video, no SSL, no SRTP
-          Write-Host "Configuring PJSIP for minimal build (audio only, no SSL/SRTP)"
-          Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
-          Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
-          Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
-          Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
-          Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
-          Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
-          Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
-          Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
-          Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
-          Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
-          Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
         shell: powershell
         working-directory: pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
 
