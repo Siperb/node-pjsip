@@ -7,29 +7,39 @@
         "src/pjsip_wrapper.cpp"
       ],
       "include_dirs": [
-        "node_modules/node-addon-api",
-        "deps/pjsip/build/include"
+        "<!@(node -p \"require('node-addon-api').include\")",
+        "pjproject-2.15.1/pjproject-2.15.1/pjlib/include",
+        "pjproject-2.15.1/pjproject-2.15.1/pjlib-util/include",
+        "pjproject-2.15.1/pjproject-2.15.1/pjmedia/include",
+        "pjproject-2.15.1/pjproject-2.15.1/pjnath/include",
+        "pjproject-2.15.1/pjproject-2.15.1/pjsip/include"
       ],
       "conditions": [
         ["OS=='win'", {
           "libraries": [
-            "ws2_32.lib"
+            "ws2_32.lib",
+            "advapi32.lib",
+            "crypt32.lib",
+            "iphlpapi.lib",
+            "winmm.lib",
+            "msvcrt.lib",
+            "kernel32.lib",
+            "user32.lib",
+            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
-              "ExceptionHandling": 1
+              "ExceptionHandling": 1,
+              "AdditionalOptions": ["/std:c++17"]
+            },
+            "VCLinkerTool": {
+              "AdditionalOptions": ["/NODEFAULTLIB:MSVCRT"]
             }
           }
         }],
         ["OS=='mac'", {
           "libraries": [
-            "<(module_root_dir)/deps/pjsip/build/lib/libpj-arm-apple-darwin24.5.0.a",
-            "<(module_root_dir)/deps/pjsip/build/lib/libpjlib-util-arm-apple-darwin24.5.0.a",
-            "<(module_root_dir)/deps/pjsip/build/lib/libpjnath-arm-apple-darwin24.5.0.a",
-            "<(module_root_dir)/deps/pjsip/build/lib/libpjsip-arm-apple-darwin24.5.0.a",
-            "<(module_root_dir)/deps/pjsip/build/lib/libpjsip-ua-arm-apple-darwin24.5.0.a",
-            "<(module_root_dir)/deps/pjsip/build/lib/libpjsua-arm-apple-darwin24.5.0.a",
-            "<(module_root_dir)/deps/pjsip/build/lib/libpjsua2-arm-apple-darwin24.5.0.a"
+            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
           ],
           "xcode_settings": {
             "MACOSX_DEPLOYMENT_TARGET": "15.0",
@@ -41,7 +51,12 @@
       "defines": [
         "NAPI_CPP_EXCEPTIONS",
         "PJ_IS_LITTLE_ENDIAN=1",
-        "PJ_IS_BIG_ENDIAN=0"
+        "PJ_IS_BIG_ENDIAN=0",
+        "PJ_WIN64=1",
+        "PJ_M_X86_64=1",
+        "WIN64=1",
+        "WIN32=1",
+        "_WIN32_WINNT=0x0601"
       ]
     }
   ]

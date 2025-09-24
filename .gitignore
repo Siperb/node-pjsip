@@ -410,6 +410,8 @@ FodyWeavers.xsd
 /pjsip
 /deps
 
+# PJSIP source code (large binary files)
+
 # Node.js
 node_modules/
 package-lock.json
