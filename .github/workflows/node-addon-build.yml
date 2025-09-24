@@ -1,1 +1,42 @@
 
+name: Build Node.js Addon
+
+on:
+  push:
+    branches: [ main, 0.0.10 ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build native addon
+      run: npm run build
+    
+    - name: Test
+      run: node test.js
+
+  build-macos:
+    runs-on: macos-latest
+    if: false
+    steps:
+    - name: Skip macOS build
+      run: echo "Skipping macOS build as code is Windows-specific"
+
+  build-linux:
+    runs-on: ubuntu-latest
+    if: false
+    steps:
+    - name: Skip Linux build
+      run: echo "Skipping Linux build as code is Windows-specific"
