@@ -392,50 +392,58 @@ jobs:
           echo "Building PJSIP core libraries..."
           if exist "pjproject-vs14.sln" (
             echo "Building using Visual Studio solution file..."
-            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            echo "Cleaning previous build artifacts..."
+            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /t:Clean
+            echo "Building PJSIP solution for x64..."
+            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build PJSIP solution"
-              exit /b %errorlevel%
+              echo "Trying alternative build approach..."
+              msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+              if errorlevel 1 (
+                echo "ERROR: Alternative build also failed"
+                exit /b %errorlevel%
+              )
             )
           ) else (
             echo "Building individual projects..."
             echo "Building pjlib..."
-            msbuild pjlib\pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            msbuild pjlib\pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjlib"
               exit /b %errorlevel%
             )
             
             echo "Building pjlib-util..."
-            msbuild pjlib-util\pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            msbuild pjlib-util\pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjlib-util"
               exit /b %errorlevel%
             )
             
             echo "Building pjmedia..."
-            msbuild pjmedia\pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            msbuild pjmedia\pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjmedia"
               exit /b %errorlevel%
             )
             
             echo "Building pjnath..."
-            msbuild pjnath\pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            msbuild pjnath\pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjnath"
               exit /b %errorlevel%
             )
             
             echo "Building pjsip..."
-            msbuild pjsip\pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            msbuild pjsip\pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjsip"
               exit /b %errorlevel%
             )
             
             echo "Building pjsua..."
-            msbuild pjsip-apps\pjsua\pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+            msbuild pjsip-apps\pjsua\pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjsua"
               exit /b %errorlevel%
@@ -444,15 +452,33 @@ jobs:
           
           echo "PJSIP libraries built successfully"
           echo "Checking for generated libraries..."
+          echo "Current directory contents after build:"
+          dir
+          echo "Looking for lib directory..."
           if exist "lib" (
+            echo "lib directory found"
             dir lib\*.lib
             if errorlevel 1 (
               echo "ERROR: No .lib files found in lib directory"
+              echo "Contents of lib directory:"
+              dir lib
               exit /b 1
             )
           ) else (
-            echo "ERROR: lib directory not found"
-            exit /b 1
+            echo "lib directory not found, checking for alternative output directories..."
+            echo "Looking for build directories:"
+            dir /s *.lib
+            echo "Creating lib directory and copying any found libraries..."
+            mkdir lib
+            for /r %%f in (*.lib) do (
+              echo "Found library: %%f"
+              copy "%%f" lib\
+            )
+            dir lib\*.lib
+            if errorlevel 1 (
+              echo "ERROR: Still no .lib files found after search"
+              exit /b 1
+            )
           )
           
           echo "PJSIP library build completed successfully"
