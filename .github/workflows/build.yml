@@ -83,11 +83,16 @@ jobs:
         working-directory: ./pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-          echo "Cleaning previous build artifacts"
-          msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /t:Clean
+          echo "Cleaning previous build artifacts manually"
           if exist "lib" rmdir /s /q "lib"
           if exist "bin" rmdir /s /q "bin"
-          echo "Clean completed"
+          if exist "pjlib\lib" rmdir /s /q "pjlib\lib"
+          if exist "pjlib-util\lib" rmdir /s /q "pjlib-util\lib"
+          if exist "pjmedia\lib" rmdir /s /q "pjmedia\lib"
+          if exist "pjnath\lib" rmdir /s /q "pjnath\lib"
+          if exist "pjsip\lib" rmdir /s /q "pjsip\lib"
+          if exist "pjsip-apps\bin" rmdir /s /q "pjsip-apps\bin"
+          echo "Manual clean completed"
         shell: cmd
 
       - name: MSBuild (minimal build - x64 only)
@@ -96,13 +101,21 @@ jobs:
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Building PJSIP with minimal configuration (audio only) - x64 architecture"
           echo "Building core PJSIP projects only..."
-          msbuild pjlib/pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
-          msbuild pjlib-util/pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
-          msbuild pjmedia/pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
-          msbuild pjnath/pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
-          msbuild pjsip/pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
-          msbuild pjsip-apps/pjsua/pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          echo "Building pjlib..."
+          msbuild pjlib/pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          echo "Building pjlib-util..."
+          msbuild pjlib-util/pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          echo "Building pjmedia..."
+          msbuild pjmedia/pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          echo "Building pjnath..."
+          msbuild pjnath/pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          echo "Building pjsip..."
+          msbuild pjsip/pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          echo "Building pjsua..."
+          msbuild pjsip-apps/pjsua/pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
           echo "Core PJSIP projects built successfully"
+          echo "Checking for generated libraries..."
+          dir lib\*.lib
         shell: cmd
 
       - name: skip test tools (minimal build)
