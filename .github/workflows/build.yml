@@ -98,6 +98,9 @@ jobs:
           Write-Host "Current working directory:"
           pwd
           Write-Host "Checking for pjlib directory..."
+          Write-Host "Available directories:"
+          dir
+          Write-Host "Checking for pjlib/include/pj..."
           if (Test-Path "pjlib/include/pj") {
             Write-Host "pjlib/include/pj found"
             cd pjlib/include/pj
@@ -121,10 +124,84 @@ jobs:
             Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
             Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
           } else {
-            Write-Host "pjlib/include/pj not found"
-            Write-Host "Available directories:"
-            dir
-            exit 1
+            Write-Host "pjlib/include/pj not found - checking if we need to create the structure"
+            Write-Host "Checking if pjlib exists..."
+            if (Test-Path "pjlib") {
+              Write-Host "pjlib found, checking include directory..."
+              dir pjlib
+              if (Test-Path "pjlib/include") {
+                Write-Host "pjlib/include found, checking pj directory..."
+                dir pjlib/include
+                if (Test-Path "pjlib/include/pj") {
+                  Write-Host "pjlib/include/pj found after detailed check"
+                  cd pjlib/include/pj
+                  New-Item -ItemType File -Name "config_site.h" -Force
+                  Write-Host "Created config_site.h"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+                  Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+                  Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+                } else {
+                  Write-Host "pjlib/include/pj not found - creating it"
+                  New-Item -ItemType Directory -Path "pjlib/include/pj" -Force
+                  cd pjlib/include/pj
+                  New-Item -ItemType File -Name "config_site.h" -Force
+                  Write-Host "Created config_site.h"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+                  Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+                  Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+                }
+              } else {
+                Write-Host "pjlib/include not found - creating full structure"
+                New-Item -ItemType Directory -Path "pjlib/include/pj" -Force
+                cd pjlib/include/pj
+                New-Item -ItemType File -Name "config_site.h" -Force
+                Write-Host "Created config_site.h"
+                Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+                Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+                Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+                Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+                Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+                Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+                Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+              }
+            } else {
+              Write-Host "pjlib not found - creating full structure"
+              New-Item -ItemType Directory -Path "pjlib/include/pj" -Force
+              cd pjlib/include/pj
+              New-Item -ItemType File -Name "config_site.h" -Force
+              Write-Host "Created config_site.h"
+              Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+              Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+              Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+              Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+              Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+              Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+              Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+            }
           }
         shell: powershell
         working-directory: pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
