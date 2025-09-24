@@ -98,7 +98,7 @@ jobs:
           if ($correctRoot) {
             Write-Host "Using PJSIP root directory: $correctRoot"
             # Set the correct root directory for subsequent steps
-            Write-Host "CORRECT_ROOT_DIR=$correctRoot" >> $env:GITHUB_ENV
+            echo "CORRECT_ROOT_DIR=$correctRoot" >> $env:GITHUB_ENV
           } else {
             Write-Host "ERROR: No valid PJSIP directory found"
             Write-Host "Available directories:"
@@ -107,7 +107,7 @@ jobs:
           }
           
           Write-Host "=== FINAL VALIDATION ==="
-          $rootDir = $env:CORRECT_ROOT_DIR
+          $rootDir = $correctRoot
           Write-Host "Using root directory: $rootDir"
           
           Write-Host "=== ROOT DIRECTORY CONTENTS ==="
