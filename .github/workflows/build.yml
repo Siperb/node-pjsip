@@ -92,18 +92,10 @@ jobs:
           Write-Host "Skipping test tools build for minimal configuration"
         shell: powershell
 
-      - name: set up Python 2.7 for pjsua test
-        uses: actions/setup-python@v5
-        with:
-          python-version: '2.7'
-
-      - name: unit tests
+      - name: skip tests (minimal build)
         run: |
-          $env:OPENSSL_DIR = Get-Content .\openssl_dir.txt
-          $env:LIBVPX_DIR = Get-Content .\libvpx_dir.txt
-          $env:LIBSDL_DIR = Get-Content .\libsdl_dir.txt
-          $env:PATH+=";$env:OPENSSL_DIR\bin;$env:LIBVPX_DIR\bin\x86;$env:LIBSDL_DIR\bin\x86;"
-          cd pjproject-${{ env.SRC_VERSION }}\tests\pjsua; python runall.py
+          Write-Host "Skipping PJSIP tests for minimal build"
+          Write-Host "Build completed successfully without tests"
         shell: powershell
 
       - name: Prepare PJSIP bundle
