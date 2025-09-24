@@ -1,38 +1,48 @@
 {
-  "name": "node-pjsip",
-  "version": "0.1.0",
-  "description": "Node.js bindings for the PJSIP SIP stack (GPL-2.0)",
-  "main": "lib/index.js",
+  "name": "pjsip-node",
+  "version": "1.0.0",
+  "description": "PJSIP wrapper for Node.js - Similar to baresip-node",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "install": "node-gyp rebuild",
-    "build": "node build.js",
-    "rebuild": "node-gyp rebuild",
-    "clean": "node-gyp clean",
-    "test": "node test.js",
-    "start": "node test.js",
-    "electron": "electron main.js",
-    "electron-dev": "electron main.js --dev",
-    "build-and-run": "npm run build && npm run electron"
+    "build": "npm run build:native && npm run build:js",
+    "build:native": "node-gyp rebuild",
+    "build:js": "tsc",
+    "test": "node dist/test.js",
+    "example": "node dist/example.js",
+    "clean": "rimraf build dist",
+    "prebuild": "npm run clean && mkdir -p build",
+    "configure": "node-gyp configure",
+    "install": "npm run build",
+    "start": "node dist/test.js"
   },
-  "gypfile": true,
   "keywords": [
+    "pjsip",
     "sip",
     "voip",
-    "pjsip",
-    "webrtc",
-    "telephony"
+    "node",
+    "addon",
+    "baresip",
+    "native"
   ],
-  "license": "GPL-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Siperb/node-pjsip.git"
-  },
+  "author": "Bhavdeep",
+  "license": "MIT",
   "dependencies": {
     "bindings": "^1.5.0",
-    "node-addon-api": "^8.3.1"
+    "node-addon-api": "^8.5.0"
   },
   "devDependencies": {
-    "electron": "^38.1.0",
-    "node-gyp": "^11.3.0"
-  }
+    "@types/node": "^20.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "build/Release/",
+    "README.md",
+    "LICENSE"
+  ]
 }
