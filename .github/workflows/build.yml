@@ -63,8 +63,9 @@ jobs:
               dir "pjproject-${{ env.SRC_VERSION }}/pjlib"
               
               Write-Host "=== CHECKING FOR PJLIB.VCXPROJ ==="
-              if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjlib/pjlib.vcxproj") {
-                Write-Host "pjlib.vcxproj found!"
+              $pjlibVcxproj = Get-ChildItem "pjproject-${{ env.SRC_VERSION }}/pjlib" -Filter "pjlib.vcxproj" -Recurse
+              if ($pjlibVcxproj) {
+                Write-Host "pjlib.vcxproj found at: $($pjlibVcxproj.FullName)"
               } else {
                 Write-Host "ERROR: pjlib.vcxproj not found in pjlib directory"
                 Write-Host "Looking for any .vcxproj files in pjlib:"
@@ -128,8 +129,9 @@ jobs:
           
           # Final verification
           Write-Host "=== FINAL VERIFICATION ==="
-          if (Test-Path "$pjprojectDir/pjlib/pjlib.vcxproj") {
-            Write-Host "SUCCESS: pjlib.vcxproj found at correct location"
+          $finalCheck = Get-ChildItem "$pjprojectDir/pjlib" -Filter "pjlib.vcxproj" -Recurse
+          if ($finalCheck) {
+            Write-Host "SUCCESS: pjlib.vcxproj found at correct location: $($finalCheck.FullName)"
           } else {
             Write-Host "ERROR: pjlib.vcxproj still not found after structure fix"
             Write-Host "Available .vcxproj files:"
@@ -147,7 +149,7 @@ jobs:
             
             # Try to find the correct root directory
             $possibleRoots = Get-ChildItem -Directory | Where-Object { 
-              Test-Path "$($_.Name)/pjlib/pjlib.vcxproj" 
+              (Get-ChildItem "$($_.Name)/pjlib" -Filter "pjlib.vcxproj" -Recurse -ErrorAction SilentlyContinue)
             }
             
             if ($possibleRoots.Count -gt 0) {
