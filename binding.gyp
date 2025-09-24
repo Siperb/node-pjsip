@@ -8,11 +8,12 @@
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
-        "pjproject-2.15.1/pjproject-2.15.1/pjlib/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjlib-util/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjmedia/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjnath/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjsip/include"
+        "pjsip-install/include",
+        "pjsip-install/include/pjlib",
+        "pjsip-install/include/pjlib-util",
+        "pjsip-install/include/pjmedia",
+        "pjsip-install/include/pjnath",
+        "pjsip-install/include/pjsip"
       ],
       "conditions": [
         ["OS=='win'", {
@@ -25,7 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
+            "pjsip-install/lib/libpjproject-x86_64-x64-vc14-Release.lib"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -39,7 +40,7 @@
         }],
         ["OS=='mac'", {
           "libraries": [
-            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
+            "pjsip-install/lib/libpjproject-x86_64-x64-vc14-Release.lib"
           ],
           "xcode_settings": {
             "MACOSX_DEPLOYMENT_TARGET": "15.0",

@@ -21,6 +21,19 @@ jobs:
     - name: Install dependencies
       run: npm install
     
+    - name: Extract PJSIP
+      run: |
+        7z x pjproject-2.15.1.zip -o.
+        dir pjproject-2.15.1
+    
+    - name: Build PJSIP
+      shell: cmd
+      run: |
+        cd pjproject-2.15.1
+        python configure.py --prefix=%CD%\..\pjsip-install
+        msbuild /p:Configuration=Release pjproject-vs14.sln
+        msbuild /p:Configuration=Release /t:install pjproject-vs14.sln
+    
     - name: Build native addon
       run: npm run build
     
