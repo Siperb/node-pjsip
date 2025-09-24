@@ -24,6 +24,12 @@ jobs:
       - name: Unzip PJ Project
         run: |
           Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force
+          Write-Host "Checking extracted contents..."
+          dir
+          Write-Host "Checking pjproject directory structure..."
+          if (Test-Path "pjproject-${{ env.SRC_VERSION }}") {
+            dir "pjproject-${{ env.SRC_VERSION }}"
+          }
         shell: powershell
 
       - name: skip openssl (build without SSL)
@@ -73,14 +79,14 @@ jobs:
           Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
           Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
         shell: powershell
-        working-directory: ./pjproject-${{ env.SRC_VERSION }}
+        working-directory: ./pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
 
       - name: check VsDevCmd.bat
         run: dir "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
         shell: cmd
 
       - name: Clean previous builds
-        working-directory: ./pjproject-${{ env.SRC_VERSION }}
+        working-directory: ./pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Cleaning previous build artifacts manually"
@@ -96,10 +102,14 @@ jobs:
         shell: cmd
 
       - name: MSBuild (minimal build - x64 only)
-        working-directory: ./pjproject-${{ env.SRC_VERSION }}
+        working-directory: ./pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Building PJSIP with minimal configuration (audio only) - x64 architecture"
+          echo "Current directory:"
+          cd
+          echo "Checking for project files..."
+          dir *.vcxproj
           echo "Building core PJSIP projects only..."
           echo "Building pjlib..."
           msbuild pjlib/pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
