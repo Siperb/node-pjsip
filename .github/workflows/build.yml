@@ -56,18 +56,22 @@ jobs:
           Write-Host "SDL disabled - PJSIP will build without SDL video"
         shell: powershell
 
-      - name: config site (minimal build)
+      - name: config site (minimal build - no SSL)
         run: |
           cd pjlib/include/pj; cp config_site_test.h config_site.h
-          # Minimal configuration - audio only, no video, no SSL
-          Write-Host "Configuring PJSIP for minimal build (audio only)"
+          # Minimal configuration - audio only, no video, no SSL, no SRTP
+          Write-Host "Configuring PJSIP for minimal build (audio only, no SSL/SRTP)"
           Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
           Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
           Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
           Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
           Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
           Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
-          Write-Host "PJSIP configured for audio-only build"
+          Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+          Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+          Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+          Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+          Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
         shell: powershell
         working-directory: ./pjproject-${{ env.SRC_VERSION }}
 
