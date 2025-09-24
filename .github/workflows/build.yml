@@ -24,12 +24,23 @@ jobs:
       - name: Download PJSIP source
         run: |
           Write-Host "Downloading PJSIP source code..."
-          $url = "https://github.com/pjsip/pjproject/archive/${{ env.SRC_VERSION }}.zip"
+          $url = "https://github.com/pjsip/pjproject/archive/refs/tags/${{ env.SRC_VERSION }}.zip"
           $output = "pjproject-${{ env.SRC_VERSION }}.zip"
           Write-Host "Downloading from: $url"
-          Invoke-WebRequest -Uri $url -OutFile $output
-          Write-Host "Download completed. File size:"
-          Get-Item $output | Select-Object Name, Length
+          try {
+            Invoke-WebRequest -Uri $url -OutFile $output -ErrorAction Stop
+            Write-Host "Download completed successfully. File size:"
+            Get-Item $output | Select-Object Name, Length
+          } catch {
+            Write-Host "ERROR: Failed to download PJSIP source"
+            Write-Host "Error: $($_.Exception.Message)"
+            Write-Host "Trying alternative URL..."
+            $altUrl = "https://github.com/pjsip/pjproject/archive/${{ env.SRC_VERSION }}.zip"
+            Write-Host "Alternative URL: $altUrl"
+            Invoke-WebRequest -Uri $altUrl -OutFile $output -ErrorAction Stop
+            Write-Host "Alternative download completed. File size:"
+            Get-Item $output | Select-Object Name, Length
+          }
         shell: powershell
 
       - name: Unzip PJ Project
@@ -45,129 +56,105 @@ jobs:
           }
           
           Write-Host "Extracting archive..."
-          Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force
+          try {
+            Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force -ErrorAction Stop
+            Write-Host "Archive extracted successfully"
+          } catch {
+            Write-Host "ERROR: Failed to extract archive"
+            Write-Host "Error: $($_.Exception.Message)"
+            Write-Host "Archive file details:"
+            Get-Item "pjproject-${{ env.SRC_VERSION }}.zip" | Select-Object *
+            exit 1
+          }
           
           Write-Host "=== ROOT DIRECTORY CONTENTS ==="
           dir
           
-          Write-Host "=== CHECKING FOR PJPROJECT DIRECTORY ==="
-          if (Test-Path "pjproject-${{ env.SRC_VERSION }}") {
-            Write-Host "pjproject-${{ env.SRC_VERSION }} directory found"
-            Write-Host "=== PJPROJECT DIRECTORY CONTENTS ==="
-            dir "pjproject-${{ env.SRC_VERSION }}"
-            
-            Write-Host "=== CHECKING FOR PJLIB DIRECTORY ==="
-            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjlib") {
-              Write-Host "pjlib directory found"
-              Write-Host "=== PJLIB DIRECTORY CONTENTS ==="
-              dir "pjproject-${{ env.SRC_VERSION }}/pjlib"
-              
-              Write-Host "=== CHECKING FOR PJLIB.VCXPROJ ==="
-              $pjlibVcxproj = Get-ChildItem "pjproject-${{ env.SRC_VERSION }}/pjlib" -Filter "pjlib.vcxproj" -Recurse
+          Write-Host "=== SEARCHING FOR PJPROJECT DIRECTORY ==="
+          # Look for any directory that might contain PJSIP source
+          $possibleDirs = Get-ChildItem -Directory | Where-Object { 
+            $_.Name -like "*pjproject*" -or $_.Name -like "*pjsip*" 
+          }
+          
+          Write-Host "Found possible PJSIP directories:"
+          $possibleDirs | ForEach-Object { Write-Host "  $($_.Name)" }
+          
+          # Determine the correct root directory
+          $correctRoot = $null
+          foreach ($dir in $possibleDirs) {
+            Write-Host "Checking directory: $($dir.Name)"
+            $pjlibPath = Join-Path $dir.FullName "pjlib"
+            if (Test-Path $pjlibPath) {
+              Write-Host "Found pjlib in: $($dir.Name)"
+              $pjlibVcxproj = Get-ChildItem $pjlibPath -Filter "pjlib.vcxproj" -Recurse -ErrorAction SilentlyContinue
               if ($pjlibVcxproj) {
-                Write-Host "pjlib.vcxproj found at: $($pjlibVcxproj.FullName)"
-              } else {
-                Write-Host "ERROR: pjlib.vcxproj not found in pjlib directory"
-                Write-Host "Looking for any .vcxproj files in pjlib:"
-                Get-ChildItem "pjproject-${{ env.SRC_VERSION }}/pjlib" -Filter "*.vcxproj" -Recurse
-                exit 1
+                Write-Host "Found pjlib.vcxproj in: $($dir.Name)"
+                $correctRoot = $dir.Name
+                break
               }
-            } else {
-              Write-Host "ERROR: pjlib directory not found in extracted archive"
-              Write-Host "Looking for any pjlib directories:"
-              Get-ChildItem -Recurse -Directory -Name "*pjlib*"
-              exit 1
             }
-            
-            Write-Host "=== CHECKING FOR PJSIP DIRECTORY ==="
-            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjsip") {
-              Write-Host "pjsip directory found"
-              Write-Host "=== PJSIP DIRECTORY CONTENTS ==="
-              dir "pjproject-${{ env.SRC_VERSION }}/pjsip"
-            } else {
-              Write-Host "ERROR: pjsip directory not found in extracted archive"
-              Write-Host "Looking for any pjsip directories:"
-              Get-ChildItem -Recurse -Directory -Name "*pjsip*"
-              exit 1
-            }
-            
-            Write-Host "=== CHECKING FOR ALL .VCXPROJ FILES ==="
-            Write-Host "All .vcxproj files found:"
-            Get-ChildItem -Recurse -Filter "*.vcxproj" | Select-Object FullName
-            
+          }
+          
+          if ($correctRoot) {
+            Write-Host "Using PJSIP root directory: $correctRoot"
+            # Set the correct root directory for subsequent steps
+            Write-Host "CORRECT_ROOT_DIR=$correctRoot" >> $env:GITHUB_ENV
           } else {
-            Write-Host "ERROR: pjproject-${{ env.SRC_VERSION }} directory not found after extraction"
-            Write-Host "Looking for any directories containing 'pjproject':"
-            Get-ChildItem -Directory -Name "*pjproject*"
+            Write-Host "ERROR: No valid PJSIP directory found"
+            Write-Host "Available directories:"
+            Get-ChildItem -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
             exit 1
           }
+          
+          Write-Host "=== FINAL VALIDATION ==="
+          $rootDir = $env:CORRECT_ROOT_DIR
+          Write-Host "Using root directory: $rootDir"
+          
+          Write-Host "=== ROOT DIRECTORY CONTENTS ==="
+          dir $rootDir
+          
+          Write-Host "=== CHECKING FOR PJLIB DIRECTORY ==="
+          if (Test-Path "$rootDir/pjlib") {
+            Write-Host "pjlib directory found"
+            Write-Host "=== PJLIB DIRECTORY CONTENTS ==="
+            dir "$rootDir/pjlib"
+            
+            Write-Host "=== CHECKING FOR PJLIB.VCXPROJ ==="
+            $pjlibVcxproj = Get-ChildItem "$rootDir/pjlib" -Filter "pjlib.vcxproj" -Recurse
+            if ($pjlibVcxproj) {
+              Write-Host "pjlib.vcxproj found at: $($pjlibVcxproj.FullName)"
+            } else {
+              Write-Host "ERROR: pjlib.vcxproj not found in pjlib directory"
+              Write-Host "Looking for any .vcxproj files in pjlib:"
+              Get-ChildItem "$rootDir/pjlib" -Filter "*.vcxproj" -Recurse
+              exit 1
+            }
+          } else {
+            Write-Host "ERROR: pjlib directory not found in $rootDir"
+            Write-Host "Looking for any pjlib directories:"
+            Get-ChildItem -Recurse -Directory -Name "*pjlib*"
+            exit 1
+          }
+          
+          Write-Host "=== CHECKING FOR PJSIP DIRECTORY ==="
+          if (Test-Path "$rootDir/pjsip") {
+            Write-Host "pjsip directory found"
+            Write-Host "=== PJSIP DIRECTORY CONTENTS ==="
+            dir "$rootDir/pjsip"
+          } else {
+            Write-Host "ERROR: pjsip directory not found in $rootDir"
+            Write-Host "Looking for any pjsip directories:"
+            Get-ChildItem -Recurse -Directory -Name "*pjsip*"
+            exit 1
+          }
+          
+          Write-Host "=== CHECKING FOR ALL .VCXPROJ FILES ==="
+          Write-Host "All .vcxproj files found:"
+          Get-ChildItem -Recurse -Filter "*.vcxproj" | Select-Object FullName
           
           Write-Host "PJSIP extraction and validation completed successfully"
         shell: powershell
 
-      - name: Fix nested directory structure (if needed)
-        run: |
-          Write-Host "Checking for nested directory structure..."
-          $pjprojectDir = "pjproject-${{ env.SRC_VERSION }}"
-          
-          # Check if we have a nested structure like pjproject-2.15.1/pjproject-2.15.1/
-          if (Test-Path "$pjprojectDir/$pjprojectDir") {
-            Write-Host "Nested directory structure detected: $pjprojectDir/$pjprojectDir"
-            Write-Host "Contents of nested directory:"
-            dir "$pjprojectDir/$pjprojectDir"
-            
-            # Check if the nested directory has the actual source files
-            if (Test-Path "$pjprojectDir/$pjprojectDir/pjlib") {
-              Write-Host "Moving contents from nested directory to parent..."
-              # Move all contents from nested to parent, excluding the nested directory itself
-              Get-ChildItem "$pjprojectDir/$pjprojectDir" | Move-Item -Destination "$pjprojectDir/" -Force
-              Write-Host "Contents moved successfully"
-              Write-Host "New structure:"
-              dir "$pjprojectDir"
-            }
-          }
-          
-          # Final verification
-          Write-Host "=== FINAL VERIFICATION ==="
-          $finalCheck = Get-ChildItem "$pjprojectDir/pjlib" -Filter "pjlib.vcxproj" -Recurse
-          if ($finalCheck) {
-            Write-Host "SUCCESS: pjlib.vcxproj found at correct location: $($finalCheck.FullName)"
-          } else {
-            Write-Host "ERROR: pjlib.vcxproj still not found after structure fix"
-            Write-Host "Available .vcxproj files:"
-            Get-ChildItem -Recurse -Filter "*.vcxproj" | Select-Object FullName
-            
-            Write-Host "=== ATTEMPTING ALTERNATIVE STRUCTURE FIX ==="
-            # Look for any directory that contains pjlib
-            $pjlibDirs = Get-ChildItem -Recurse -Directory -Name "*pjlib*"
-            Write-Host "Found pjlib directories: $pjlibDirs"
-            
-            # Look for any .vcxproj files
-            $vcxprojFiles = Get-ChildItem -Recurse -Filter "*.vcxproj"
-            Write-Host "Found .vcxproj files:"
-            $vcxprojFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
-            
-            # Try to find the correct root directory
-            $possibleRoots = Get-ChildItem -Directory | Where-Object { 
-              (Get-ChildItem "$($_.Name)/pjlib" -Filter "pjlib.vcxproj" -Recurse -ErrorAction SilentlyContinue)
-            }
-            
-            if ($possibleRoots.Count -gt 0) {
-              Write-Host "Found possible root directories with pjlib.vcxproj:"
-              $possibleRoots | ForEach-Object { Write-Host "  $($_.Name)" }
-              
-              # Use the first valid root
-              $correctRoot = $possibleRoots[0].Name
-              Write-Host "Using root directory: $correctRoot"
-              
-              # Update the environment variable for subsequent steps
-              Write-Host "CORRECT_ROOT_DIR=$correctRoot" >> $env:GITHUB_ENV
-            } else {
-              Write-Host "ERROR: No valid root directory found with pjlib.vcxproj"
-              exit 1
-            }
-          }
-        shell: powershell
 
       - name: skip openssl (build without SSL)
         run: |
