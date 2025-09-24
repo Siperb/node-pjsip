@@ -26,78 +26,21 @@ jobs:
           Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force
         shell: powershell
 
-      - name: get openssl
+      - name: skip openssl (build without SSL)
         run: |
-          try {
-            # Try multiple OpenSSL sources
-            $urls = @(
-              "https://github.com/openssl/openssl/archive/OpenSSL_1_1_1q.zip",
-              "https://github.com/openssl/openssl/archive/OpenSSL_1_1_1u.zip"
-            )
-            
-            $success = $false
-            foreach ($url in $urls) {
-              try {
-                Write-Host "Trying OpenSSL from: $url"
-                Invoke-WebRequest -Uri $url -OutFile ".\openssl-source.zip"
-                if (Test-Path ".\openssl-source.zip") {
-                  Write-Host "OpenSSL downloaded successfully from: $url"
-                  $success = $true
-                  break
-                }
-              } catch {
-                Write-Host "Failed to download from $url : $_"
-                continue
-              }
-            }
-            
-            if (-not $success) {
-              Write-Host "All OpenSSL downloads failed, continuing without OpenSSL"
-              Add-Content openssl_dir.txt ""
-              exit 0
-            }
-          } catch {
-            Write-Host "OpenSSL download failed, continuing without OpenSSL: $_"
-            Add-Content openssl_dir.txt ""
-            exit 0
-          }
+          Write-Host "Skipping OpenSSL - building PJSIP without SSL support"
+          Add-Content openssl_dir.txt ""
+          Write-Host "OpenSSL disabled - PJSIP will build without SSL features"
         shell: powershell
 
-      - name: extract openssl
+      - name: verify openssl skip
         run: |
-          try {
-            if (Test-Path ".\openssl-source.zip") {
-              Expand-Archive -LiteralPath ".\openssl-source.zip" -DestinationPath ".\openssl_build\" -Force
-              if (Test-Path ".\openssl_build") {
-                cd openssl_build
-                $opensslDir = Get-ChildItem -Directory | Select-Object -First 1
-                if ($opensslDir) {
-                  Add-Content ..\openssl_dir.txt $opensslDir.FullName
-                  Write-Host "OpenSSL extracted to: $($opensslDir.FullName)"
-                } else {
-                  Add-Content ..\openssl_dir.txt ""
-                  Write-Host "OpenSSL extraction completed but no directory found"
-                }
-              } else {
-                Add-Content openssl_dir.txt ""
-                Write-Host "OpenSSL extraction failed, continuing without OpenSSL"
-              }
-            } else {
-              Add-Content openssl_dir.txt ""
-              Write-Host "No OpenSSL source found, continuing without OpenSSL"
-            }
-          } catch {
-            Write-Host "OpenSSL extraction failed, continuing without OpenSSL: $_"
-            Add-Content openssl_dir.txt ""
+          Write-Host "OpenSSL verification: SSL support disabled"
+          if (Test-Path "openssl_dir.txt") {
+            $content = Get-Content "openssl_dir.txt"
+            Write-Host "OpenSSL dir content: '$content'"
           }
         shell: powershell
-
-      - name: check openssl folder
-        run: |
-          set /P OPENSSL_DIR=<openssl_dir.txt
-          dir "%OPENSSL_DIR%\include"
-          dir "%OPENSSL_DIR%\lib"
-        shell: cmd
 
       - name: get libvpx
         run: |
