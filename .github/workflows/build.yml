@@ -549,22 +549,34 @@ jobs:
           Write-Host "Copying PJSIP libraries for Node addon build"
           $rootDir = "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}"
           Write-Host "Using root directory: $rootDir"
-          if (Test-Path "$rootDir\lib") {
-            $libFiles = Get-ChildItem "$rootDir\lib\*.lib"
-            if ($libFiles.Count -gt 0) {
-              Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
-              Write-Host "PJSIP libraries copied successfully:"
-              Get-ChildItem "*.lib" | Select-Object Name, Length
-            } else {
-              Write-Host "ERROR: No .lib files found in $rootDir\lib"
-              Write-Host "Available files in $rootDir\lib:"
-              Get-ChildItem "$rootDir\lib"
-              exit 1
+          
+          # Create the expected lib directory structure
+          if (-not (Test-Path "$rootDir\lib")) {
+            Write-Host "Creating lib directory: $rootDir\lib"
+            New-Item -ItemType Directory -Path "$rootDir\lib" -Force
+          }
+          
+          # Search for any .lib files in the PJSIP directory tree
+          Write-Host "Searching for .lib files in PJSIP directory..."
+          $allLibFiles = Get-ChildItem -Path $rootDir -Filter "*.lib" -Recurse
+          if ($allLibFiles.Count -gt 0) {
+            Write-Host "Found $($allLibFiles.Count) .lib files:"
+            $allLibFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
+            
+            # Copy all found .lib files to the lib directory
+            $allLibFiles | ForEach-Object {
+              Copy-Item -Path $_.FullName -Destination "$rootDir\lib\" -Force
+              Write-Host "Copied: $($_.Name)"
             }
+            
+            # Now copy to current directory for node-gyp
+            Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
+            Write-Host "PJSIP libraries copied to current directory:"
+            Get-ChildItem "*.lib" | Select-Object Name, Length
           } else {
-            Write-Host "ERROR: $rootDir\lib directory does not exist"
-            Write-Host "Available directories:"
-            Get-ChildItem -Directory
+            Write-Host "ERROR: No .lib files found anywhere in $rootDir"
+            Write-Host "Available files in $rootDir:"
+            Get-ChildItem -Path $rootDir -Recurse | Where-Object { $_.Extension -eq ".lib" -or $_.Extension -eq ".obj" -or $_.Extension -eq ".exe" }
             exit 1
           }
           
