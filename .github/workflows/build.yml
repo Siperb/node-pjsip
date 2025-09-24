@@ -63,10 +63,16 @@ jobs:
             Expand-Archive -LiteralPath .\libvpx.zip -DestinationPath .\libvpx_build\ -Force
             if (Test-Path ".\libvpx_build") {
               cd libvpx_build
-              Add-Content ..\libvpx_dir.txt $pwd.Path
-              Write-Host "libvpx extracted successfully"
+              $libvpxDir = Get-ChildItem -Directory | Select-Object -First 1
+              if ($libvpxDir) {
+                Add-Content ..\libvpx_dir.txt $libvpxDir.FullName
+                Write-Host "libvpx extracted to: $($libvpxDir.FullName)"
+              } else {
+                Add-Content ..\libvpx_dir.txt $pwd
+                Write-Host "libvpx extracted to: $pwd"
+              }
             } else {
-              Write-Error "libvpx extraction failed"
+              Write-Error "libvpx extraction failed - directory not found"
               exit 1
             }
           } catch {
@@ -103,10 +109,16 @@ jobs:
             Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\ -Force
             if (Test-Path ".\libsdl_build") {
               cd libsdl_build
-              Add-Content ..\libsdl_dir.txt $pwd.Path
-              Write-Host "SDL extracted successfully"
+              $sdlDir = Get-ChildItem -Directory | Select-Object -First 1
+              if ($sdlDir) {
+                Add-Content ..\libsdl_dir.txt $sdlDir.FullName
+                Write-Host "SDL extracted to: $($sdlDir.FullName)"
+              } else {
+                Add-Content ..\libsdl_dir.txt $pwd
+                Write-Host "SDL extracted to: $pwd"
+              }
             } else {
-              Write-Error "SDL extraction failed"
+              Write-Error "SDL extraction failed - directory not found"
               exit 1
             }
           } catch {
