@@ -26,7 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "<!(node -e \"const fs=require('fs'); const path=require('path'); const arch = process.arch === 'x64' ? 'x86_64-x64' : 'i386-Win32'; const libPath = 'pjproject-2.15.1/lib/libpjproject-' + arch + '-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found: ' + libPath); process.exit(1); }\")"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const libs = ['pjlib', 'pjlib-util', 'pjmedia', 'pjnath', 'pjsip', 'pjsua']; const arch = process.arch === 'x64' ? 'x86_64-x64' : 'i386-Win32'; const foundLibs = []; libs.forEach(lib => { const libPath = 'pjproject-2.15.1/lib/' + lib + '-' + arch + '-vc14-Release.lib'; if(fs.existsSync(libPath)) { foundLibs.push(path.resolve(libPath)); } else { console.log('lib not found: ' + libPath); } }); if(foundLibs.length === 0) { console.log('No PJSIP libraries found'); process.exit(1); } foundLibs.forEach(lib => console.log(lib));\")"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {

@@ -244,11 +244,11 @@ jobs:
           echo "Manual clean completed"
         shell: cmd
 
-      - name: Create PJSIP library stub for Node.js addon
+      - name: Build PJSIP libraries
         working-directory: pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-          echo "Creating PJSIP library stub for Node.js addon build..."
+          echo "Building PJSIP libraries for Node.js addon..."
           echo "Current directory:"
           cd
           echo "Available files:"
@@ -260,41 +260,64 @@ jobs:
             echo "ERROR: cl compiler not found in PATH"
             exit /b 1
           )
-          where lib
+          where nmake
           if errorlevel 1 (
-            echo "ERROR: lib tool not found in PATH"
+            echo "ERROR: nmake not found in PATH"
             exit /b 1
           )
           
-          echo "Creating lib directory structure..."
-          if not exist "lib" mkdir lib
-          
-          echo "Creating a minimal PJSIP library stub..."
-          echo "This is a minimal stub library for PJSIP" > stub.txt
-          
-          rem Create a minimal object file
-          echo int pj_init(void) { return 0; } > stub.c
-          echo int pj_shutdown(void) { return 0; } >> stub.c
-          echo int pjsip_endpt_create(void) { return 0; } >> stub.c
-          echo int pjmedia_endpt_create(void) { return 0; } >> stub.c
-          
-          echo "Compiling stub object file..."
-          cl /c stub.c /Fo:stub.obj
-          if errorlevel 1 (
-            echo "ERROR: Failed to compile stub.c"
-            exit /b %errorlevel%
+          echo "Checking for Visual Studio project files..."
+          if exist "pjlib\pjlib.vcxproj" (
+            echo "pjlib.vcxproj found"
+          ) else (
+            echo "ERROR: pjlib.vcxproj not found"
+            exit /b 1
           )
-          echo "Stub object file created successfully"
-          dir stub.*
           
-          echo "Creating library from object file..."
-          lib stub.obj /OUT:lib\libpjproject-x86_64-x64-vc14-Release.lib
+          echo "Building PJSIP core libraries..."
+          echo "Building pjlib..."
+          msbuild pjlib\pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
           if errorlevel 1 (
-            echo "ERROR: Failed to create library from stub.obj"
+            echo "ERROR: Failed to build pjlib"
             exit /b %errorlevel%
           )
           
-          echo "PJSIP library stub created successfully"
+          echo "Building pjlib-util..."
+          msbuild pjlib-util\pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          if errorlevel 1 (
+            echo "ERROR: Failed to build pjlib-util"
+            exit /b %errorlevel%
+          )
+          
+          echo "Building pjmedia..."
+          msbuild pjmedia\pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          if errorlevel 1 (
+            echo "ERROR: Failed to build pjmedia"
+            exit /b %errorlevel%
+          )
+          
+          echo "Building pjnath..."
+          msbuild pjnath\pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          if errorlevel 1 (
+            echo "ERROR: Failed to build pjnath"
+            exit /b %errorlevel%
+          )
+          
+          echo "Building pjsip..."
+          msbuild pjsip\pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          if errorlevel 1 (
+            echo "ERROR: Failed to build pjsip"
+            exit /b %errorlevel%
+          )
+          
+          echo "Building pjsua..."
+          msbuild pjsip-apps\pjsua\pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal
+          if errorlevel 1 (
+            echo "ERROR: Failed to build pjsua"
+            exit /b %errorlevel%
+          )
+          
+          echo "PJSIP libraries built successfully"
           echo "Checking for generated libraries..."
           if exist "lib" (
             dir lib\*.lib
@@ -303,16 +326,11 @@ jobs:
               exit /b 1
             )
           ) else (
-            echo "ERROR: Failed to create lib directory"
+            echo "ERROR: lib directory not found"
             exit /b 1
           )
           
-          echo "Cleaning up temporary files..."
-          if exist "stub.c" del stub.c
-          if exist "stub.obj" del stub.obj
-          if exist "stub.txt" del stub.txt
-          
-          echo "PJSIP stub library creation completed successfully"
+          echo "PJSIP library build completed successfully"
         shell: cmd
 
       - name: skip test tools (minimal build)
@@ -355,8 +373,16 @@ jobs:
           echo "Copying library files..."
           if exist "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" (
             xcopy /Y pjproject-${{ env.SRC_VERSION }}\lib\*.lib pjsip-bundle\lib\
+            echo "Library files copied successfully"
+            dir pjsip-bundle\lib\*.lib
           ) else (
             echo "WARNING: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
+            echo "Available files in pjproject-${{ env.SRC_VERSION }}\lib:"
+            if exist "pjproject-${{ env.SRC_VERSION }}\lib" (
+              dir pjproject-${{ env.SRC_VERSION }}\lib
+            ) else (
+              echo "lib directory does not exist"
+            )
           )
         shell: cmd
 
@@ -370,20 +396,38 @@ jobs:
           npm ci
           # Copy PJSIP libraries to expected location for Node addon build
           Write-Host "Copying PJSIP libraries for Node addon build"
-          if (Test-Path "pjproject-${{ env.SRC_VERSION }}\lib\*.lib") {
-            Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" -Destination "." -Force
-            Write-Host "PJSIP libraries copied successfully"
-            Get-ChildItem "*.lib" | Select-Object Name, Length
-          } else {
-            Write-Host "WARNING: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
-            Write-Host "Available files in pjproject-${{ env.SRC_VERSION }}\lib:"
-            if (Test-Path "pjproject-${{ env.SRC_VERSION }}\lib") {
-              Get-ChildItem "pjproject-${{ env.SRC_VERSION }}\lib"
+          if (Test-Path "pjproject-${{ env.SRC_VERSION }}\lib") {
+            $libFiles = Get-ChildItem "pjproject-${{ env.SRC_VERSION }}\lib\*.lib"
+            if ($libFiles.Count -gt 0) {
+              Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" -Destination "." -Force
+              Write-Host "PJSIP libraries copied successfully:"
+              Get-ChildItem "*.lib" | Select-Object Name, Length
             } else {
-              Write-Host "lib directory does not exist"
+              Write-Host "ERROR: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
+              Write-Host "Available files in pjproject-${{ env.SRC_VERSION }}\lib:"
+              Get-ChildItem "pjproject-${{ env.SRC_VERSION }}\lib"
+              exit 1
             }
+          } else {
+            Write-Host "ERROR: pjproject-${{ env.SRC_VERSION }}\lib directory does not exist"
+            exit 1
           }
-          npm run build
+          
+          Write-Host "Running node-gyp configure..."
+          npm run configure
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: node-gyp configure failed"
+            exit 1
+          }
+          
+          Write-Host "Running node-gyp build..."
+          npm run build:native
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: node-gyp build failed"
+            exit 1
+          }
+          
+          Write-Host "Node addon build completed successfully"
         shell: powershell
 
       - name: Upload all artifacts
