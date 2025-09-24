@@ -191,19 +191,21 @@ jobs:
           Write-Host "Checking if PJSIP directory exists..."
           Write-Host "Current directory contents:"
           dir
-          Write-Host "Checking for pjproject-${{ env.SRC_VERSION }} directory..."
-          if (Test-Path "pjproject-${{ env.SRC_VERSION }}") {
-            Write-Host "pjproject-${{ env.SRC_VERSION }} directory found"
-            dir "pjproject-${{ env.SRC_VERSION }}"
-            Write-Host "Checking for pjlib directory inside pjproject..."
-            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjlib") {
+          Write-Host "Checking for PJSIP root directory..."
+          $rootDir = $env:CORRECT_ROOT_DIR
+          if ($rootDir -and (Test-Path $rootDir)) {
+            Write-Host "PJSIP root directory found: $rootDir"
+            dir $rootDir
+            Write-Host "Checking for pjlib directory inside PJSIP..."
+            if (Test-Path "$rootDir/pjlib") {
               Write-Host "pjlib directory found"
-              dir "pjproject-${{ env.SRC_VERSION }}/pjlib"
+              dir "$rootDir/pjlib"
             } else {
               Write-Host "pjlib directory not found"
             }
           } else {
-            Write-Host "pjproject-${{ env.SRC_VERSION }} directory not found"
+            Write-Host "PJSIP root directory not found or not set"
+            Write-Host "CORRECT_ROOT_DIR = $rootDir"
           }
         shell: powershell
 
@@ -211,13 +213,16 @@ jobs:
         run: |
           Write-Host "Current working directory:"
           pwd
+          Write-Host "Using PJSIP root directory: ${{ env.CORRECT_ROOT_DIR }}"
           Write-Host "Checking for pjlib directory..."
           Write-Host "Available directories:"
           dir
           Write-Host "Checking for pjlib/include/pj..."
-          if (Test-Path "pjlib/include/pj") {
+          $pjlibPath = "${{ env.CORRECT_ROOT_DIR }}/pjlib/include/pj"
+          Write-Host "Looking for pjlib at: $pjlibPath"
+          if (Test-Path $pjlibPath) {
             Write-Host "pjlib/include/pj found"
-            cd pjlib/include/pj
+            cd $pjlibPath
             if (Test-Path "config_site_test.h") {
               cp config_site_test.h config_site.h
               Write-Host "config_site.h created from config_site_test.h"
