@@ -121,6 +121,13 @@ jobs:
       - name: Build Node addon
         run: |
           npm ci
+          # Copy PJSIP libraries to expected location for Node addon build
+          Write-Host "Copying PJSIP libraries for Node addon build"
+          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjlib\lib\*.lib" -Destination "." -Force
+          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjsip\lib\*.lib" -Destination "." -Force
+          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjnath\lib\*.lib" -Destination "." -Force
+          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjmedia\lib\*.lib" -Destination "." -Force
+          Write-Host "PJSIP libraries copied successfully"
           npm run build
         shell: powershell
 

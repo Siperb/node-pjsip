@@ -26,7 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "<!(node -e \"console.log(require('path').resolve('pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib'))\")"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const libPath='pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found'); process.exit(1); }\")"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -40,7 +40,7 @@
         }],
         ["OS=='mac'", {
           "libraries": [
-            "<!(node -e \"console.log(require('path').resolve('pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib'))\")"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const libPath='pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib'; if(fs.existsSync(libPath)) { console.log(path.resolve(libPath)); } else { console.log('lib not found'); process.exit(1); }\")"
           ],
           "xcode_settings": {
             "MACOSX_DEPLOYMENT_TARGET": "15.0",
