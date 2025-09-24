@@ -79,12 +79,30 @@ jobs:
         run: dir "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
         shell: cmd
 
-      - name: MSBuild (minimal build)
+      - name: Clean previous builds
         working-directory: ./pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-          Write-Host "Building PJSIP with minimal configuration (audio only)"
-          msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          echo "Cleaning previous build artifacts"
+          msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /t:Clean
+          if exist "lib" rmdir /s /q "lib"
+          if exist "bin" rmdir /s /q "bin"
+          echo "Clean completed"
+        shell: cmd
+
+      - name: MSBuild (minimal build - x64 only)
+        working-directory: ./pjproject-${{ env.SRC_VERSION }}
+        run: |
+          call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          echo "Building PJSIP with minimal configuration (audio only) - x64 architecture"
+          echo "Building core PJSIP projects only..."
+          msbuild pjlib/pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          msbuild pjlib-util/pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          msbuild pjmedia/pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          msbuild pjnath/pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          msbuild pjsip/pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          msbuild pjsip-apps/pjsua/pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
+          echo "Core PJSIP projects built successfully"
         shell: cmd
 
       - name: skip test tools (minimal build)
