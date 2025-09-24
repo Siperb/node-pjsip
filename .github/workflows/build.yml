@@ -84,7 +84,7 @@ jobs:
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           Write-Host "Building PJSIP with minimal configuration (audio only)"
-          msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+          msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true
         shell: cmd
 
       - name: skip test tools (minimal build)
