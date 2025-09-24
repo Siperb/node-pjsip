@@ -21,6 +21,17 @@ jobs:
         run: echo "SRC_VERSION=2.15.1" >> $env:GITHUB_ENV
         shell: powershell
 
+      - name: Download PJSIP source
+        run: |
+          Write-Host "Downloading PJSIP source code..."
+          $url = "https://github.com/pjsip/pjproject/archive/${{ env.SRC_VERSION }}.zip"
+          $output = "pjproject-${{ env.SRC_VERSION }}.zip"
+          Write-Host "Downloading from: $url"
+          Invoke-WebRequest -Uri $url -OutFile $output
+          Write-Host "Download completed. File size:"
+          Get-Item $output | Select-Object Name, Length
+        shell: powershell
+
       - name: Unzip PJ Project
         run: |
           Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force
@@ -28,17 +39,24 @@ jobs:
           dir
           Write-Host "Checking pjproject directory structure..."
           if (Test-Path "pjproject-${{ env.SRC_VERSION }}") {
+            Write-Host "pjproject-${{ env.SRC_VERSION }} directory found"
             dir "pjproject-${{ env.SRC_VERSION }}"
-            Write-Host "Checking for nested pjproject directory..."
-            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}") {
-              Write-Host "Nested pjproject directory found"
-              dir "pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}"
+            Write-Host "Checking for required subdirectories..."
+            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjlib") {
+              Write-Host "pjlib directory found"
             } else {
-              Write-Host "Nested pjproject directory not found - creating it"
-              New-Item -ItemType Directory -Path "pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}" -Force
-              Get-ChildItem "pjproject-${{ env.SRC_VERSION }}" -Exclude "pjproject-${{ env.SRC_VERSION }}" | Move-Item -Destination "pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}/" -Force
-              Write-Host "Directory structure created"
+              Write-Host "ERROR: pjlib directory not found in extracted archive"
+              exit 1
             }
+            if (Test-Path "pjproject-${{ env.SRC_VERSION }}/pjsip") {
+              Write-Host "pjsip directory found"
+            } else {
+              Write-Host "ERROR: pjsip directory not found in extracted archive"
+              exit 1
+            }
+          } else {
+            Write-Host "ERROR: pjproject-${{ env.SRC_VERSION }} directory not found after extraction"
+            exit 1
           }
         shell: powershell
 
@@ -204,14 +222,14 @@ jobs:
             }
           }
         shell: powershell
-        working-directory: pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
+        working-directory: pjproject-${{ env.SRC_VERSION }}
 
       - name: check VsDevCmd.bat
         run: dir "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
         shell: cmd
 
       - name: Clean previous builds
-        working-directory: pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
+        working-directory: pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Cleaning previous build artifacts manually"
@@ -227,7 +245,7 @@ jobs:
         shell: cmd
 
       - name: Create PJSIP library stub for Node.js addon
-        working-directory: pjproject-${{ env.SRC_VERSION }}/pjproject-${{ env.SRC_VERSION }}
+        working-directory: pjproject-${{ env.SRC_VERSION }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Creating PJSIP library stub for Node.js addon build..."
@@ -235,6 +253,18 @@ jobs:
           cd
           echo "Available files:"
           dir
+          
+          echo "Verifying build tools availability..."
+          where cl
+          if errorlevel 1 (
+            echo "ERROR: cl compiler not found in PATH"
+            exit /b 1
+          )
+          where lib
+          if errorlevel 1 (
+            echo "ERROR: lib tool not found in PATH"
+            exit /b 1
+          )
           
           echo "Creating lib directory structure..."
           if not exist "lib" mkdir lib
@@ -248,20 +278,33 @@ jobs:
           echo int pjsip_endpt_create(void) { return 0; } >> stub.c
           echo int pjmedia_endpt_create(void) { return 0; } >> stub.c
           
-          rem Compile the stub
+          echo "Compiling stub object file..."
           cl /c stub.c /Fo:stub.obj
+          if errorlevel 1 (
+            echo "ERROR: Failed to compile stub.c"
+            exit /b %errorlevel%
+          )
+          echo "Stub object file created successfully"
+          dir stub.*
           
-          rem Create the library
+          echo "Creating library from object file..."
           lib stub.obj /OUT:lib\libpjproject-x86_64-x64-vc14-Release.lib
+          if errorlevel 1 (
+            echo "ERROR: Failed to create library from stub.obj"
+            exit /b %errorlevel%
+          )
           
           echo "PJSIP library stub created successfully"
           echo "Checking for generated libraries..."
           if exist "lib" (
             dir lib\*.lib
+            if errorlevel 1 (
+              echo "ERROR: No .lib files found in lib directory"
+              exit /b 1
+            )
           ) else (
-            echo "Failed to create lib directory"
-            mkdir lib
-            echo "Created empty lib directory as fallback"
+            echo "ERROR: Failed to create lib directory"
+            exit /b 1
           )
           
           echo "Cleaning up temporary files..."
@@ -269,7 +312,7 @@ jobs:
           if exist "stub.obj" del stub.obj
           if exist "stub.txt" del stub.txt
           
-          echo "PJSIP stub library creation completed"
+          echo "PJSIP stub library creation completed successfully"
         shell: cmd
 
       - name: skip test tools (minimal build)
@@ -288,14 +331,33 @@ jobs:
           mkdir pjsip-bundle
           mkdir pjsip-bundle\lib
           mkdir pjsip-bundle\include
-          xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjlib\include pjsip-bundle\include\pjlib
-          xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjsip\include pjsip-bundle\include\pjsip
-          xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjnath\include pjsip-bundle\include\pjnath
-          xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjmedia\include pjsip-bundle\include\pjmedia
-          xcopy /Y pjproject-${{ env.SRC_VERSION }}\pjlib\lib\*.lib pjsip-bundle\lib\
-          xcopy /Y pjproject-${{ env.SRC_VERSION }}\pjsip\lib\*.lib pjsip-bundle\lib\
-          xcopy /Y pjproject-${{ env.SRC_VERSION }}\pjnath\lib\*.lib pjsip-bundle\lib\
-          xcopy /Y pjproject-${{ env.SRC_VERSION }}\pjmedia\lib\*.lib pjsip-bundle\lib\
+          echo "Copying header files..."
+          if exist "pjproject-${{ env.SRC_VERSION }}\pjlib\include" (
+            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjlib\include pjsip-bundle\include\pjlib
+          ) else (
+            echo "WARNING: pjlib\include not found"
+          )
+          if exist "pjproject-${{ env.SRC_VERSION }}\pjsip\include" (
+            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjsip\include pjsip-bundle\include\pjsip
+          ) else (
+            echo "WARNING: pjsip\include not found"
+          )
+          if exist "pjproject-${{ env.SRC_VERSION }}\pjnath\include" (
+            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjnath\include pjsip-bundle\include\pjnath
+          ) else (
+            echo "WARNING: pjnath\include not found"
+          )
+          if exist "pjproject-${{ env.SRC_VERSION }}\pjmedia\include" (
+            xcopy /Y /I pjproject-${{ env.SRC_VERSION }}\pjmedia\include pjsip-bundle\include\pjmedia
+          ) else (
+            echo "WARNING: pjmedia\include not found"
+          )
+          echo "Copying library files..."
+          if exist "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" (
+            xcopy /Y pjproject-${{ env.SRC_VERSION }}\lib\*.lib pjsip-bundle\lib\
+          ) else (
+            echo "WARNING: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
+          )
         shell: cmd
 
       - name: Zip PJSIP bundle
@@ -308,11 +370,19 @@ jobs:
           npm ci
           # Copy PJSIP libraries to expected location for Node addon build
           Write-Host "Copying PJSIP libraries for Node addon build"
-          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjlib\lib\*.lib" -Destination "." -Force
-          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjsip\lib\*.lib" -Destination "." -Force
-          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjnath\lib\*.lib" -Destination "." -Force
-          Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\pjmedia\lib\*.lib" -Destination "." -Force
-          Write-Host "PJSIP libraries copied successfully"
+          if (Test-Path "pjproject-${{ env.SRC_VERSION }}\lib\*.lib") {
+            Copy-Item -Path "pjproject-${{ env.SRC_VERSION }}\lib\*.lib" -Destination "." -Force
+            Write-Host "PJSIP libraries copied successfully"
+            Get-ChildItem "*.lib" | Select-Object Name, Length
+          } else {
+            Write-Host "WARNING: No .lib files found in pjproject-${{ env.SRC_VERSION }}\lib"
+            Write-Host "Available files in pjproject-${{ env.SRC_VERSION }}\lib:"
+            if (Test-Path "pjproject-${{ env.SRC_VERSION }}\lib") {
+              Get-ChildItem "pjproject-${{ env.SRC_VERSION }}\lib"
+            } else {
+              Write-Host "lib directory does not exist"
+            }
+          }
           npm run build
         shell: powershell
 
