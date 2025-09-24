@@ -329,14 +329,14 @@ jobs:
             }
           }
         shell: powershell
-        working-directory: ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}
+        working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
 
       - name: check VsDevCmd.bat
         run: dir "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
         shell: cmd
 
       - name: Clean previous builds
-        working-directory: ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}
+        working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Cleaning previous build artifacts manually"
@@ -352,7 +352,7 @@ jobs:
         shell: cmd
 
       - name: Build PJSIP libraries
-        working-directory: ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}
+        working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
         run: |
           call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           echo "Building PJSIP libraries for Node.js addon..."
@@ -457,36 +457,36 @@ jobs:
           mkdir pjsip-bundle\lib
           mkdir pjsip-bundle\include
           echo "Copying header files..."
-          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjlib\include" (
-            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjlib\include pjsip-bundle\include\pjlib
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjlib\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjlib\include pjsip-bundle\include\pjlib
           ) else (
             echo "WARNING: pjlib\include not found"
           )
-          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjsip\include" (
-            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjsip\include pjsip-bundle\include\pjsip
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjsip\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjsip\include pjsip-bundle\include\pjsip
           ) else (
             echo "WARNING: pjsip\include not found"
           )
-          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjnath\include" (
-            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjnath\include pjsip-bundle\include\pjnath
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjnath\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjnath\include pjsip-bundle\include\pjnath
           ) else (
             echo "WARNING: pjnath\include not found"
           )
-          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjmedia\include" (
-            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\pjmedia\include pjsip-bundle\include\pjmedia
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjmedia\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjmedia\include pjsip-bundle\include\pjmedia
           ) else (
             echo "WARNING: pjmedia\include not found"
           )
           echo "Copying library files..."
-          if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib\*.lib" (
-            xcopy /Y ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib\*.lib pjsip-bundle\lib\
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib\*.lib" (
+            xcopy /Y ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib\*.lib pjsip-bundle\lib\
             echo "Library files copied successfully"
             dir pjsip-bundle\lib\*.lib
           ) else (
-            echo "WARNING: No .lib files found in ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib"
-            echo "Available files in ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib:"
-            if exist "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib" (
-              dir ${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}\lib
+            echo "WARNING: No .lib files found in ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib"
+            echo "Available files in ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib:"
+            if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib" (
+              dir ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib
             ) else (
               echo "lib directory does not exist"
             )
@@ -503,7 +503,7 @@ jobs:
           npm ci
           # Copy PJSIP libraries to expected location for Node addon build
           Write-Host "Copying PJSIP libraries for Node addon build"
-          $rootDir = "${{ env.CORRECT_ROOT_DIR || 'pjproject-' + env.SRC_VERSION }}"
+          $rootDir = "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}"
           Write-Host "Using root directory: $rootDir"
           if (Test-Path "$rootDir\lib") {
             $libFiles = Get-ChildItem "$rootDir\lib\*.lib"
