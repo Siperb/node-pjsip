@@ -17,6 +17,44 @@ jobs:
           node-version: '18'
           check-latest: true
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,)'
+          msbuild-architecture: x64
+
+      - name: Setup Visual Studio environment
+        run: |
+          # Import the VS environment for x64 architecture
+          $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $vsPath) {
+            Write-Host "Setting up Visual Studio 2022 Enterprise x64 environment"
+            cmd /c "`"$vsPath`" && set" | ForEach-Object {
+              if ($_ -match "^([^=]+)=(.*)$") {
+                [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+                if ($matches[1] -eq "PATH") {
+                  $env:PATH = $matches[2]
+                }
+              }
+            }
+          } else {
+            Write-Host "ERROR: Visual Studio 2022 Enterprise vcvars64.bat not found"
+            exit 1
+          }
+
+          # Verify critical build tools are available
+          $tools = @("cl", "link", "lib", "nmake")
+          foreach ($tool in $tools) {
+            $toolPath = Get-Command $tool -ErrorAction SilentlyContinue
+            if ($toolPath) {
+              Write-Host "✓ $tool found at: $($toolPath.Source)"
+            } else {
+              Write-Host "✗ $tool not found in PATH"
+              exit 1
+            }
+          }
+        shell: powershell
+
       - name: Set Project src
         run: echo "SRC_VERSION=2.15.1" >> $env:GITHUB_ENV
         shell: powershell
@@ -566,168 +604,102 @@ jobs:
 
       - name: Build Node addon
         run: |
+          # Install dependencies
           npm ci
-          # Copy PJSIP libraries to expected location for Node addon build
-          Write-Host "Copying PJSIP libraries for Node addon build"
+
+          # Copy PJSIP libraries to expected location
+          Write-Host "Copying PJSIP libraries for Node addon build..."
           $rootDir = "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}"
-          Write-Host "Using root directory: $rootDir"
-          
-          # Create the expected lib directory structure
-          if (-not (Test-Path "$rootDir\lib")) {
-            Write-Host "Creating lib directory: $rootDir\lib"
-            New-Item -ItemType Directory -Path "$rootDir\lib" -Force
+          Write-Host "Using PJSIP root directory: $rootDir"
+
+          # Ensure lib directory exists
+          $libDir = "$rootDir\lib"
+          if (-not (Test-Path $libDir)) {
+            Write-Host "Creating lib directory: $libDir"
+            New-Item -ItemType Directory -Path $libDir -Force
           }
-          
-          # Search for any .lib files in the PJSIP directory tree
-          Write-Host "Searching for .lib files in PJSIP directory..."
+
+          # Search for .lib files in the PJSIP directory tree
+          Write-Host "Searching for .lib files in PJSIP build output..."
           $allLibFiles = Get-ChildItem -Path $rootDir -Filter "*.lib" -Recurse
+
           if ($allLibFiles.Count -gt 0) {
             Write-Host "Found $($allLibFiles.Count) .lib files:"
-            $allLibFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
-            
-            # Ensure lib directory exists
-            if (-not (Test-Path "$rootDir\lib")) {
-              New-Item -ItemType Directory -Path "$rootDir\lib" -Force
-            }
-            
-            # Copy all found .lib files to the lib directory (avoid copying to same location)
-            $allLibFiles | ForEach-Object {
-              $destPath = "$rootDir\lib\$($_.Name)"
-              $sourcePath = $_.FullName
-              # Resolve full paths to handle path comparison properly
-              $resolvedSource = [System.IO.Path]::GetFullPath($sourcePath)
-              $resolvedDest = [System.IO.Path]::GetFullPath($destPath)
-              if ($resolvedSource -ne $resolvedDest) {
-                Copy-Item -Path $sourcePath -Destination "$rootDir\lib\" -Force
-                Write-Host "Copied: $($_.Name)"
-              } else {
-                Write-Host "Skipping: $($_.Name) (already in correct location)"
-              }
-            }
-            
-            # Now copy to current directory for node-gyp
-            if (Test-Path "$rootDir\lib\*.lib") {
-              Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
-              Write-Host "PJSIP libraries copied to current directory:"
-              Get-ChildItem "*.lib" | Select-Object Name, Length
-            } else {
-              Write-Host "No .lib files found in $rootDir\lib"
-            }
-          } else {
-            Write-Host "No .lib files found, but found .obj files. Creating libraries from object files..."
-            
-            # Find all .obj files and create libraries from them
-            $objFiles = Get-ChildItem -Path $rootDir -Filter "*.obj" -Recurse
-            Write-Host "Found $($objFiles.Count) .obj files"
-            
-            # Set up Visual Studio environment for lib.exe (x64)
-            Write-Host "Setting up Visual Studio environment for lib.exe (x64)..."
-            $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-            if (Test-Path $vsPath) {
-              Write-Host "Found Visual Studio 2022 Enterprise (x64)"
-              cmd /c "`"$vsPath`" && set" | ForEach-Object {
-                if ($_ -match "^([^=]+)=(.*)$") {
-                  [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
-                }
-              }
-            } else {
-              # Try Community edition
-              $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-              if (Test-Path $vsPath) {
-                Write-Host "Found Visual Studio 2022 Community (x64)"
-                cmd /c "`"$vsPath`" && set" | ForEach-Object {
-                  if ($_ -match "^([^=]+)=(.*)$") {
-                    [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
-                  }
-                }
-              } else {
-                Write-Host "ERROR: Visual Studio x64 environment not found. Cannot create libraries."
-                exit 1
-              }
-            }
-            
-            # Verify lib.exe is available
-            $libExe = Get-Command "lib.exe" -ErrorAction SilentlyContinue
-            if (-not $libExe) {
-              Write-Host "ERROR: lib.exe not found in PATH after setting up Visual Studio environment"
-              Write-Host "Current PATH: $env:PATH"
-              exit 1
-            }
-            Write-Host "lib.exe found at: $($libExe.Source)"
-            
-            # Group .obj files by their parent directory to create individual libraries
-            $objGroups = $objFiles | Group-Object { $_.Directory.Name }
-            
-            foreach ($group in $objGroups) {
-              $libName = $group.Name + ".lib"
-              $libPath = Join-Path "$rootDir\lib" $libName
-              Write-Host "Creating library: $libName from $($group.Count) object files"
-              
-              # Use lib.exe to create library from object files
-              $objPaths = $group.Group | ForEach-Object { "`"$($_.FullName)`"" }
-              $libCmd = "lib.exe /OUT:`"$libPath`" " + ($objPaths -join " ")
-              Write-Host "Running: $libCmd"
-              
-              try {
-                Invoke-Expression $libCmd
-                if ($LASTEXITCODE -eq 0) {
-                  Write-Host "Successfully created: $libName"
-                } else {
-                  Write-Host "Failed to create: $libName"
-                }
-              } catch {
-                Write-Host "Error creating $libName : $($_.Exception.Message)"
-              }
-            }
-            
-            # Check if we now have .lib files
-            $newLibFiles = Get-ChildItem -Path "$rootDir\lib" -Filter "*.lib"
-            if ($newLibFiles.Count -gt 0) {
-              Write-Host "Successfully created $($newLibFiles.Count) libraries:"
-              $newLibFiles | ForEach-Object { Write-Host "  $($_.Name)" }
-              
-              # Copy to current directory for node-gyp
-              Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
-              Write-Host "PJSIP libraries copied to current directory:"
-              Get-ChildItem "*.lib" | Select-Object Name, Length
-            } else {
-              Write-Host "ERROR: Still no .lib files found after creation attempt"
-              Write-Host "Available files in ${rootDir}:"
-              Get-ChildItem -Path $rootDir -Recurse | Where-Object { $_.Extension -eq ".lib" -or $_.Extension -eq ".obj" -or $_.Extension -eq ".exe" }
-              exit 1
-            }
-          }
-          
-          Write-Host "Setting up Visual Studio environment for node-gyp (x64)..."
-          if (Test-Path "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat") {
-            cmd /c "`"${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set" | ForEach-Object {
-              if ($_ -match "^([^=]+)=(.*)$") {
-                [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+            $allLibFiles | ForEach-Object { Write-Host "  $($_.Name) at $($_.Directory.FullName)" }
+
+            # Copy all libraries to the lib directory
+            foreach ($lib in $allLibFiles) {
+              $destPath = "$libDir\$($lib.Name)"
+              if ($lib.FullName -ne $destPath) {
+                Copy-Item -Path $lib.FullName -Destination $libDir -Force
+                Write-Host "Copied: $($lib.Name)"
               }
             }
           } else {
-            cmd /c "`"${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat`" && set" | ForEach-Object {
-              if ($_ -match "^([^=]+)=(.*)$") {
-                [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
-              }
+            Write-Host "ERROR: No .lib files found in PJSIP directory tree"
+            Write-Host "Available files in ${rootDir}:"
+            Get-ChildItem -Path $rootDir -Recurse -Include "*.lib", "*.obj", "*.exe" | Select-Object FullName
+            exit 1
+          }
+
+          # Verify we have all required libraries
+          $requiredLibs = @(
+            "pjlib-x86_64-x64-vc14-Release.lib",
+            "pjlib-util-x86_64-x64-vc14-Release.lib",
+            "pjmedia-x86_64-x64-vc14-Release.lib",
+            "pjnath-x86_64-x64-vc14-Release.lib",
+            "pjsip-core-x86_64-x64-vc14-Release.lib",
+            "pjsip-ua-x86_64-x64-vc14-Release.lib",
+            "pjsua2-lib-x86_64-x64-vc14-Release.lib"
+          )
+
+          $missingLibs = @()
+          foreach ($reqLib in $requiredLibs) {
+            if (-not (Test-Path "$libDir\$reqLib")) {
+              $missingLibs += $reqLib
             }
           }
-          
-          Write-Host "Running node-gyp configure with x64 architecture..."
-          npm run configure -- --arch=x64
+
+          if ($missingLibs.Count -gt 0) {
+            Write-Host "WARNING: Missing some required libraries:"
+            $missingLibs | ForEach-Object { Write-Host "  $_" }
+            Write-Host "Available libraries:"
+            Get-ChildItem "$libDir\*.lib" | ForEach-Object { Write-Host "  $($_.Name)" }
+          } else {
+            Write-Host "✓ All required PJSIP libraries found"
+          }
+
+          Write-Host "Configuring Node.js addon build..."
+          npm run configure
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: node-gyp configure failed"
             exit 1
           }
-          
-          Write-Host "Running node-gyp build with x64 architecture..."
-          npm run build:native -- --arch=x64
+
+          Write-Host "Building Node.js addon..."
+          npm run build:native
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: node-gyp build failed"
             exit 1
           }
-          
-          Write-Host "Node addon build completed successfully"
+
+          Write-Host "✓ Node addon build completed successfully"
+
+          # Verify the addon was built
+          if (Test-Path "build\Release\node_pjsip.node") {
+            Write-Host "✓ Node addon successfully created: build\Release\node_pjsip.node"
+            $addonFile = Get-Item "build\Release\node_pjsip.node"
+            Write-Host "  Size: $($addonFile.Length) bytes"
+          } else {
+            Write-Host "ERROR: Node addon file not found at build\Release\node_pjsip.node"
+            Write-Host "Build directory contents:"
+            if (Test-Path "build\Release") {
+              Get-ChildItem "build\Release" | Select-Object Name, Length
+            } else {
+              Write-Host "  build\Release directory does not exist"
+            }
+            exit 1
+          }
         shell: powershell
 
       - name: Upload all artifacts
