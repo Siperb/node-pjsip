@@ -593,8 +593,12 @@ jobs:
             # Copy all found .lib files to the lib directory (avoid copying to same location)
             $allLibFiles | ForEach-Object {
               $destPath = "$rootDir\lib\$($_.Name)"
-              if ($_.FullName -ne $destPath) {
-                Copy-Item -Path $_.FullName -Destination "$rootDir\lib\" -Force
+              $sourcePath = $_.FullName
+              # Resolve full paths to handle path comparison properly
+              $resolvedSource = [System.IO.Path]::GetFullPath($sourcePath)
+              $resolvedDest = [System.IO.Path]::GetFullPath($destPath)
+              if ($resolvedSource -ne $resolvedDest) {
+                Copy-Item -Path $sourcePath -Destination "$rootDir\lib\" -Force
                 Write-Host "Copied: $($_.Name)"
               } else {
                 Write-Host "Skipping: $($_.Name) (already in correct location)"
