@@ -325,14 +325,31 @@ jobs:
         shell: powershell
         working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
 
-      - name: check VsDevCmd.bat
-        run: dir "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+      - name: check Visual Studio tools
+        run: |
+          echo "Checking for Visual Studio 2022 Enterprise..."
+          if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            echo "Found vcvars64.bat for x64 architecture"
+          ) else (
+            echo "vcvars64.bat not found, checking for Community edition..."
+            if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
+              echo "Found vcvars64.bat in Community edition"
+            ) else (
+              echo "ERROR: vcvars64.bat not found in either Enterprise or Community edition"
+              exit /b 1
+            )
+          )
         shell: cmd
 
       - name: Clean previous builds
         working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
         run: |
-          call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          echo "Setting up Visual Studio environment for x64..."
+          if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          ) else (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          )
           echo "Cleaning previous build artifacts manually"
           if exist "lib" rmdir /s /q "lib"
           if exist "bin" rmdir /s /q "bin"
@@ -348,7 +365,12 @@ jobs:
       - name: Build PJSIP libraries
         working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
         run: |
-          call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          echo "Setting up Visual Studio environment for x64..."
+          if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          ) else (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          )
           echo "Building PJSIP libraries for Node.js addon..."
           echo "Current directory:"
           cd
@@ -393,13 +415,13 @@ jobs:
           if exist "pjproject-vs14.sln" (
             echo "Building using Visual Studio solution file..."
             echo "Cleaning previous build artifacts..."
-            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /t:Clean
+            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /t:Clean /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             echo "Building PJSIP solution for x64..."
-            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64 /p:TargetArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build PJSIP solution"
               echo "Trying alternative build approach..."
-              msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+              msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
               if errorlevel 1 (
                 echo "ERROR: Alternative build also failed"
                 exit /b %errorlevel%
@@ -408,42 +430,42 @@ jobs:
           ) else (
             echo "Building individual projects..."
             echo "Building pjlib..."
-            msbuild pjlib\pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+            msbuild pjlib\pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjlib"
               exit /b %errorlevel%
             )
             
             echo "Building pjlib-util..."
-            msbuild pjlib-util\pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+            msbuild pjlib-util\pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjlib-util"
               exit /b %errorlevel%
             )
             
             echo "Building pjmedia..."
-            msbuild pjmedia\pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+            msbuild pjmedia\pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjmedia"
               exit /b %errorlevel%
             )
             
             echo "Building pjnath..."
-            msbuild pjnath\pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+            msbuild pjnath\pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjnath"
               exit /b %errorlevel%
             )
             
             echo "Building pjsip..."
-            msbuild pjsip\pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+            msbuild pjsip\pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjsip"
               exit /b %errorlevel%
             )
             
             echo "Building pjsua..."
-            msbuild pjsip-apps\pjsua\pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64
+            msbuild pjsip-apps\pjsua\pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
             if errorlevel 1 (
               echo "ERROR: Failed to build pjsua"
               exit /b %errorlevel%
@@ -580,11 +602,11 @@ jobs:
             $objFiles = Get-ChildItem -Path $rootDir -Filter "*.obj" -Recurse
             Write-Host "Found $($objFiles.Count) .obj files"
             
-            # Set up Visual Studio environment for lib.exe
-            Write-Host "Setting up Visual Studio environment for lib.exe..."
+            # Set up Visual Studio environment for lib.exe (x64)
+            Write-Host "Setting up Visual Studio environment for lib.exe (x64)..."
             $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
             if (Test-Path $vsPath) {
-              Write-Host "Found Visual Studio 2022 Enterprise"
+              Write-Host "Found Visual Studio 2022 Enterprise (x64)"
               cmd /c "`"$vsPath`" && set" | ForEach-Object {
                 if ($_ -match "^([^=]+)=(.*)$") {
                   [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
@@ -594,14 +616,14 @@ jobs:
               # Try Community edition
               $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
               if (Test-Path $vsPath) {
-                Write-Host "Found Visual Studio 2022 Community"
+                Write-Host "Found Visual Studio 2022 Community (x64)"
                 cmd /c "`"$vsPath`" && set" | ForEach-Object {
                   if ($_ -match "^([^=]+)=(.*)$") {
                     [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
                   }
                 }
               } else {
-                Write-Host "ERROR: Visual Studio not found. Cannot create libraries."
+                Write-Host "ERROR: Visual Studio x64 environment not found. Cannot create libraries."
                 exit 1
               }
             }
@@ -658,15 +680,30 @@ jobs:
             }
           }
           
-          Write-Host "Running node-gyp configure..."
-          npm run configure
+          Write-Host "Setting up Visual Studio environment for node-gyp (x64)..."
+          if (Test-Path "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat") {
+            cmd /c "`"${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set" | ForEach-Object {
+              if ($_ -match "^([^=]+)=(.*)$") {
+                [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+              }
+            }
+          } else {
+            cmd /c "`"${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat`" && set" | ForEach-Object {
+              if ($_ -match "^([^=]+)=(.*)$") {
+                [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+              }
+            }
+          }
+          
+          Write-Host "Running node-gyp configure with x64 architecture..."
+          npm run configure -- --arch=x64
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: node-gyp configure failed"
             exit 1
           }
           
-          Write-Host "Running node-gyp build..."
-          npm run build:native
+          Write-Host "Running node-gyp build with x64 architecture..."
+          npm run build:native -- --arch=x64
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: node-gyp build failed"
             exit 1
