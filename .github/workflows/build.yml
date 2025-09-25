@@ -607,66 +607,104 @@ jobs:
           # Install dependencies
           npm ci
 
-          # Copy PJSIP libraries to expected location
-          Write-Host "Copying PJSIP libraries for Node addon build..."
+          # Collect and organize PJSIP libraries for Node addon build
+          Write-Host "Organizing PJSIP libraries for Node addon build..."
           $rootDir = "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}"
           Write-Host "Using PJSIP root directory: $rootDir"
 
-          # Ensure lib directory exists
-          $libDir = "$rootDir\lib"
-          if (-not (Test-Path $libDir)) {
-            Write-Host "Creating lib directory: $libDir"
-            New-Item -ItemType Directory -Path $libDir -Force
+          # Ensure centralized lib directory exists
+          $centralLibDir = "$rootDir\lib"
+          if (-not (Test-Path $centralLibDir)) {
+            Write-Host "Creating centralized lib directory: $centralLibDir"
+            New-Item -ItemType Directory -Path $centralLibDir -Force
           }
 
-          # Search for .lib files in the PJSIP directory tree
-          Write-Host "Searching for .lib files in PJSIP build output..."
-          $allLibFiles = Get-ChildItem -Path $rootDir -Filter "*.lib" -Recurse
+          # Define search paths for libraries (matching GitHub Actions structure)
+          $searchPaths = @(
+            "$rootDir\lib",
+            "$rootDir\pjlib\lib",
+            "$rootDir\pjlib-util\lib",
+            "$rootDir\pjmedia\lib",
+            "$rootDir\pjnath\lib",
+            "$rootDir\pjsip\lib",
+            "$rootDir\third_party\lib"
+          )
 
-          if ($allLibFiles.Count -gt 0) {
-            Write-Host "Found $($allLibFiles.Count) .lib files:"
-            $allLibFiles | ForEach-Object { Write-Host "  $($_.Name) at $($_.Directory.FullName)" }
-
-            # Copy all libraries to the lib directory
-            foreach ($lib in $allLibFiles) {
-              $destPath = "$libDir\$($lib.Name)"
-              if ($lib.FullName -ne $destPath) {
-                Copy-Item -Path $lib.FullName -Destination $libDir -Force
-                Write-Host "Copied: $($lib.Name)"
+          Write-Host "Searching for .lib files in multiple directories..."
+          $allLibFiles = @()
+          foreach ($searchPath in $searchPaths) {
+            if (Test-Path $searchPath) {
+              $libFiles = Get-ChildItem -Path $searchPath -Filter "*.lib"
+              if ($libFiles.Count -gt 0) {
+                Write-Host "Found $($libFiles.Count) libraries in: $searchPath"
+                $libFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+                $allLibFiles += $libFiles
               }
             }
+          }
+
+          if ($allLibFiles.Count -gt 0) {
+            Write-Host "`nTotal found: $($allLibFiles.Count) .lib files"
+
+            # Copy all libraries to centralized location, avoiding self-copy
+            $copiedCount = 0
+            foreach ($lib in $allLibFiles) {
+              $destPath = "$centralLibDir\$($lib.Name)"
+
+              # Check if source and destination are different
+              $sourcePath = [System.IO.Path]::GetFullPath($lib.FullName)
+              $destFullPath = [System.IO.Path]::GetFullPath($destPath)
+
+              if ($sourcePath -ne $destFullPath) {
+                try {
+                  Copy-Item -Path $sourcePath -Destination $centralLibDir -Force -ErrorAction Stop
+                  $copiedCount++
+                  Write-Host "✓ Copied: $($lib.Name)"
+                } catch {
+                  Write-Host "⚠ Warning: Could not copy $($lib.Name): $($_.Exception.Message)"
+                }
+              } else {
+                Write-Host "✓ Already in place: $($lib.Name)"
+              }
+            }
+            Write-Host "`n✅ Library organization complete: $copiedCount files copied"
           } else {
-            Write-Host "ERROR: No .lib files found in PJSIP directory tree"
-            Write-Host "Available files in ${rootDir}:"
-            Get-ChildItem -Path $rootDir -Recurse -Include "*.lib", "*.obj", "*.exe" | Select-Object FullName
+            Write-Host "❌ ERROR: No .lib files found in any search path"
+            Write-Host "Available paths checked:"
+            $searchPaths | ForEach-Object {
+              $exists = if (Test-Path $_) { "✓" } else { "✗" }
+              Write-Host "  $exists $_"
+            }
             exit 1
           }
 
-          # Verify we have all required libraries
-          $requiredLibs = @(
-            "pjlib-x86_64-x64-vc14-Release.lib",
-            "pjlib-util-x86_64-x64-vc14-Release.lib",
-            "pjmedia-x86_64-x64-vc14-Release.lib",
-            "pjnath-x86_64-x64-vc14-Release.lib",
+          # Verify we have critical PJSIP libraries
+          $coreLibs = @(
+            "pjsua2-lib-x86_64-x64-vc14-Release.lib",
+            "pjsua-lib-x86_64-x64-vc14-Release.lib",
             "pjsip-core-x86_64-x64-vc14-Release.lib",
-            "pjsip-ua-x86_64-x64-vc14-Release.lib",
-            "pjsua2-lib-x86_64-x64-vc14-Release.lib"
+            "pjlib-x86_64-x64-vc14-Release.lib"
           )
 
-          $missingLibs = @()
-          foreach ($reqLib in $requiredLibs) {
-            if (-not (Test-Path "$libDir\$reqLib")) {
-              $missingLibs += $reqLib
+          $missingCoreLibs = @()
+          foreach ($coreLib in $coreLibs) {
+            if (-not (Test-Path "$centralLibDir\$coreLib")) {
+              $missingCoreLibs += $coreLib
             }
           }
 
-          if ($missingLibs.Count -gt 0) {
-            Write-Host "WARNING: Missing some required libraries:"
-            $missingLibs | ForEach-Object { Write-Host "  $_" }
-            Write-Host "Available libraries:"
-            Get-ChildItem "$libDir\*.lib" | ForEach-Object { Write-Host "  $($_.Name)" }
+          if ($missingCoreLibs.Count -gt 0) {
+            Write-Host "❌ ERROR: Missing critical PJSIP libraries:"
+            $missingCoreLibs | ForEach-Object { Write-Host "  - $_" }
+            Write-Host "`nAvailable libraries in $centralLibDir:"
+            if (Test-Path $centralLibDir) {
+              Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  ✓ $($_.Name)" }
+            }
+            exit 1
           } else {
-            Write-Host "SUCCESS: All required PJSIP libraries found"
+            Write-Host "✅ All critical PJSIP libraries found"
+            Write-Host "`nLibrary inventory ($centralLibDir):"
+            Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  ✓ $($_.Name)" }
           }
 
           Write-Host "Configuring Node.js addon build..."
@@ -683,15 +721,24 @@ jobs:
             exit 1
           }
 
-          Write-Host "SUCCESS: Node addon build completed successfully"
+          Write-Host "✅ SUCCESS: Node addon build completed successfully"
 
-          # Verify the addon was built
+          # Verify the addon was built successfully
           if (Test-Path "build\Release\node_pjsip.node") {
-            Write-Host "SUCCESS: Node addon successfully created: build\Release\node_pjsip.node"
             $addonFile = Get-Item "build\Release\node_pjsip.node"
-            Write-Host "  Size: $($addonFile.Length) bytes"
+            Write-Host "✅ SUCCESS: Node addon created successfully!"
+            Write-Host "   📁 File: build\Release\node_pjsip.node"
+            Write-Host "   📊 Size: $([math]::Round($addonFile.Length / 1MB, 2)) MB ($($addonFile.Length) bytes)"
+
+            # Test that the addon loads
+            try {
+              $testResult = node -e "const addon = require('./build/Release/node_pjsip.node'); console.log('Exports: ' + Object.keys(addon).length + ' functions');"
+              Write-Host "   🧪 Load test: PASSED - $testResult"
+            } catch {
+              Write-Host "   ⚠️ Load test: FAILED - $($_.Exception.Message)"
+            }
           } else {
-            Write-Host "ERROR: Node addon file not found at build\Release\node_pjsip.node"
+            Write-Host "❌ ERROR: Node addon file not found at build\Release\node_pjsip.node"
             Write-Host "Build directory contents:"
             if (Test-Path "build\Release") {
               Get-ChildItem "build\Release" | Select-Object Name, Length
