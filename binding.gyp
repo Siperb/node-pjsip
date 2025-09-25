@@ -26,28 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjsua2-lib-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjsua-lib-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjsip-ua-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjsip-simple-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjsip-core-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjmedia-codec-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjmedia-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjmedia-audiodev-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjmedia-videodev-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjnath-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjlib-util-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/pjlib-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libspeex-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libilbccodec-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libg7221codec-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libgsmcodec-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libsrtp-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libresample-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libwebrtc-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libyuv-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libbaseclasses-x86_64-x64-vc14-Release.lib",
-            "<(module_root_dir)/pjproject-2.15.1/lib/libmilenage-x86_64-x64-vc14-Release.lib"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const libDir = 'pjproject-2.15.1/lib'; const foundLibs = []; if(fs.existsSync(libDir)) { const libFiles = fs.readdirSync(libDir).filter(f => f.endsWith('.lib')); libFiles.forEach(lib => { foundLibs.push(path.resolve(libDir, lib)); }); } else { console.log('lib directory not found: ' + libDir); } if(foundLibs.length === 0) { console.log('No PJSIP libraries found in ' + libDir); process.exit(1); } console.log(foundLibs.join(';'));\")"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -55,9 +34,7 @@
               "AdditionalOptions": ["/std:c++17"]
             },
             "VCLinkerTool": {
-              "AdditionalOptions": ["/NODEFAULTLIB:MSVCRT"],
-              "AdditionalDependencies": ["Delayimp.lib"],
-              "DelayLoadDLLs": ["node.exe"]
+              "AdditionalOptions": ["/NODEFAULTLIB:MSVCRT"]
             }
           }
         }],
