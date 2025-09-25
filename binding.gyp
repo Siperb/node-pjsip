@@ -8,11 +8,12 @@
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
-        "pjproject-2.15.1/pjproject-2.15.1/pjlib/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjlib-util/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjmedia/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjnath/include",
-        "pjproject-2.15.1/pjproject-2.15.1/pjsip/include"
+        "pjproject-2.15.1/pjlib/include",
+        "pjproject-2.15.1/pjlib-util/include",
+        "pjproject-2.15.1/pjmedia/include",
+        "pjproject-2.15.1/pjnath/include",
+        "pjproject-2.15.1/pjsip/include",
+        "pjproject-2.15.1/pjsip-apps/src/pjsua"
       ],
       "conditions": [
         ["OS=='win'", {
@@ -25,7 +26,7 @@
             "msvcrt.lib",
             "kernel32.lib",
             "user32.lib",
-            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const rootDir='pjproject-2.15.1'; const searchPaths=['lib','pjlib/lib','pjlib-util/lib','pjmedia/lib','pjnath/lib','pjsip/lib','third_party/lib']; const foundLibs=[]; searchPaths.forEach(sp=>{const fullPath=path.join(rootDir,sp); if(fs.existsSync(fullPath)){fs.readdirSync(fullPath).filter(f=>f.endsWith('.lib')).forEach(lib=>foundLibs.push(path.resolve(fullPath,lib)))}}); if(foundLibs.length===0){process.stderr.write('No PJSIP libraries found'); process.exit(1)}; const ordered=['pjsua2-lib','pjsua-lib','pjsip-ua','pjsip-simple','pjsip-core','pjmedia-codec','pjmedia-audiodev','pjmedia-videodev','pjmedia','pjnath','pjlib-util','pjlib','libspeex','libilbccodec','libg7221codec','libgsmcodec','libsrtp','libresample','libwebrtc','libyuv','libbaseclasses','libmilenage']; const orderedLibs=[]; ordered.forEach(name=>{const lib=foundLibs.find(l=>l.includes(name)); if(lib)orderedLibs.push(lib)}); foundLibs.forEach(lib=>{if(!orderedLibs.includes(lib))orderedLibs.push(lib)}); console.log(orderedLibs.join(';'));\")"
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -33,13 +34,15 @@
               "AdditionalOptions": ["/std:c++17"]
             },
             "VCLinkerTool": {
-              "AdditionalOptions": ["/NODEFAULTLIB:MSVCRT"]
+              "AdditionalOptions": ["/NODEFAULTLIB:MSVCRT"],
+              "AdditionalDependencies": ["Delayimp.lib"],
+              "DelayLoadDLLs": ["node.exe"]
             }
           }
         }],
         ["OS=='mac'", {
           "libraries": [
-            "C:/Users/admin/OneDrive/Desktop/Bhavdeep/pjsipoldcheckfunc/node-pjsip/pjproject-2.15.1/pjproject-2.15.1/lib/libpjproject-x86_64-x64-vc14-Release.lib"
+            "<!(node -e \"const fs=require('fs'); const path=require('path'); const libDir = 'pjproject-2.15.1/lib'; const foundLibs = []; if(fs.existsSync(libDir)) { const libFiles = fs.readdirSync(libDir).filter(f => f.endsWith('.a') || f.endsWith('.dylib')); libFiles.forEach(lib => { foundLibs.push(path.resolve(libDir, lib)); }); } else { console.log('lib directory not found: ' + libDir); } if(foundLibs.length === 0) { console.log('No PJSIP libraries found in ' + libDir); process.exit(1); } foundLibs.forEach(lib => console.log(lib));\")"
           ],
           "xcode_settings": {
             "MACOSX_DEPLOYMENT_TARGET": "15.0",

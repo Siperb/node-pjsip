@@ -1,0 +1,760 @@
+name: Build PJ Project
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          check-latest: true
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,)'
+          msbuild-architecture: x64
+
+      - name: Setup Visual Studio environment
+        run: |
+          # Import the VS environment for x64 architecture
+          $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $vsPath) {
+            Write-Host "Setting up Visual Studio 2022 Enterprise x64 environment"
+            cmd /c "`"$vsPath`" && set" | ForEach-Object {
+              if ($_ -match "^([^=]+)=(.*)$") {
+                [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+                if ($matches[1] -eq "PATH") {
+                  $env:PATH = $matches[2]
+                }
+              }
+            }
+          } else {
+            Write-Host "ERROR: Visual Studio 2022 Enterprise vcvars64.bat not found"
+            exit 1
+          }
+
+          # Verify critical build tools are available
+          $tools = @("cl", "link", "lib", "nmake")
+          foreach ($tool in $tools) {
+            $toolPath = Get-Command $tool -ErrorAction SilentlyContinue
+            if ($toolPath) {
+              Write-Host "SUCCESS: $tool found at: $($toolPath.Source)"
+            } else {
+              Write-Host "ERROR: $tool not found in PATH"
+              exit 1
+            }
+          }
+        shell: powershell
+
+      - name: Set Project src
+        run: echo "SRC_VERSION=2.15.1" >> $env:GITHUB_ENV
+        shell: powershell
+
+      - name: Download PJSIP source
+        run: |
+          Write-Host "Downloading PJSIP source code..."
+          $url = "https://github.com/pjsip/pjproject/archive/refs/tags/${{ env.SRC_VERSION }}.zip"
+          $output = "pjproject-${{ env.SRC_VERSION }}.zip"
+          Write-Host "Downloading from: $url"
+          try {
+            Invoke-WebRequest -Uri $url -OutFile $output -ErrorAction Stop
+            Write-Host "Download completed successfully. File size:"
+            Get-Item $output | Select-Object Name, Length
+          } catch {
+            Write-Host "ERROR: Failed to download PJSIP source"
+            Write-Host "Error: $($_.Exception.Message)"
+            Write-Host "Trying alternative URL..."
+            $altUrl = "https://github.com/pjsip/pjproject/archive/${{ env.SRC_VERSION }}.zip"
+            Write-Host "Alternative URL: $altUrl"
+            Invoke-WebRequest -Uri $altUrl -OutFile $output -ErrorAction Stop
+            Write-Host "Alternative download completed. File size:"
+            Get-Item $output | Select-Object Name, Length
+          }
+        shell: powershell
+
+      - name: Unzip PJ Project
+        run: |
+          Write-Host "Starting PJSIP extraction..."
+          Write-Host "Archive file: pjproject-${{ env.SRC_VERSION }}.zip"
+          if (Test-Path "pjproject-${{ env.SRC_VERSION }}.zip") {
+            Write-Host "Archive file exists, size:"
+            Get-Item "pjproject-${{ env.SRC_VERSION }}.zip" | Select-Object Name, Length
+          } else {
+            Write-Host "ERROR: Archive file not found!"
+            exit 1
+          }
+          
+          Write-Host "Extracting archive..."
+          try {
+            Expand-Archive -LiteralPath .\pjproject-${{ env.SRC_VERSION }}.zip -DestinationPath .\ -Force -ErrorAction Stop
+            Write-Host "Archive extracted successfully"
+          } catch {
+            Write-Host "ERROR: Failed to extract archive"
+            Write-Host "Error: $($_.Exception.Message)"
+            Write-Host "Archive file details:"
+            Get-Item "pjproject-${{ env.SRC_VERSION }}.zip" | Select-Object *
+            exit 1
+          }
+          
+          Write-Host "=== ROOT DIRECTORY CONTENTS ==="
+          dir
+          
+          Write-Host "=== SEARCHING FOR PJPROJECT DIRECTORY ==="
+          # Look for any directory that might contain PJSIP source
+          $possibleDirs = Get-ChildItem -Directory | Where-Object { 
+            $_.Name -like "*pjproject*" -or $_.Name -like "*pjsip*" 
+          }
+          
+          Write-Host "Found possible PJSIP directories:"
+          $possibleDirs | ForEach-Object { Write-Host "  $($_.Name)" }
+          
+          # Determine the correct root directory
+          $correctRoot = $null
+          foreach ($dir in $possibleDirs) {
+            Write-Host "Checking directory: $($dir.Name)"
+            $pjlibPath = Join-Path $dir.FullName "pjlib"
+            if (Test-Path $pjlibPath) {
+              Write-Host "Found pjlib in: $($dir.Name)"
+              $pjlibVcxproj = Get-ChildItem $pjlibPath -Filter "pjlib.vcxproj" -Recurse -ErrorAction SilentlyContinue
+              if ($pjlibVcxproj) {
+                Write-Host "Found pjlib.vcxproj in: $($dir.Name)"
+                $correctRoot = $dir.Name
+                break
+              }
+            }
+          }
+          
+          if ($correctRoot) {
+            Write-Host "Using PJSIP root directory: $correctRoot"
+            # Set the correct root directory for subsequent steps
+            echo "CORRECT_ROOT_DIR=$correctRoot" >> $env:GITHUB_ENV
+          } else {
+            Write-Host "ERROR: No valid PJSIP directory found"
+            Write-Host "Available directories:"
+            Get-ChildItem -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
+            exit 1
+          }
+          
+          Write-Host "=== FINAL VALIDATION ==="
+          $rootDir = $correctRoot
+          Write-Host "Using root directory: $rootDir"
+          
+          Write-Host "=== ROOT DIRECTORY CONTENTS ==="
+          dir $rootDir
+          
+          Write-Host "=== CHECKING FOR PJLIB DIRECTORY ==="
+          if (Test-Path "$rootDir/pjlib") {
+            Write-Host "pjlib directory found"
+            Write-Host "=== PJLIB DIRECTORY CONTENTS ==="
+            dir "$rootDir/pjlib"
+            
+            Write-Host "=== CHECKING FOR PJLIB.VCXPROJ ==="
+            $pjlibVcxproj = Get-ChildItem "$rootDir/pjlib" -Filter "pjlib.vcxproj" -Recurse
+            if ($pjlibVcxproj) {
+              Write-Host "pjlib.vcxproj found at: $($pjlibVcxproj.FullName)"
+            } else {
+              Write-Host "ERROR: pjlib.vcxproj not found in pjlib directory"
+              Write-Host "Looking for any .vcxproj files in pjlib:"
+              Get-ChildItem "$rootDir/pjlib" -Filter "*.vcxproj" -Recurse
+              exit 1
+            }
+          } else {
+            Write-Host "ERROR: pjlib directory not found in $rootDir"
+            Write-Host "Looking for any pjlib directories:"
+            Get-ChildItem -Recurse -Directory -Name "*pjlib*"
+            exit 1
+          }
+          
+          Write-Host "=== CHECKING FOR PJSIP DIRECTORY ==="
+          if (Test-Path "$rootDir/pjsip") {
+            Write-Host "pjsip directory found"
+            Write-Host "=== PJSIP DIRECTORY CONTENTS ==="
+            dir "$rootDir/pjsip"
+          } else {
+            Write-Host "ERROR: pjsip directory not found in $rootDir"
+            Write-Host "Looking for any pjsip directories:"
+            Get-ChildItem -Recurse -Directory -Name "*pjsip*"
+            exit 1
+          }
+          
+          Write-Host "=== CHECKING FOR ALL .VCXPROJ FILES ==="
+          Write-Host "All .vcxproj files found:"
+          Get-ChildItem -Recurse -Filter "*.vcxproj" | Select-Object FullName
+          
+          Write-Host "PJSIP extraction and validation completed successfully"
+        shell: powershell
+
+
+      - name: skip openssl (build without SSL)
+        run: |
+          Write-Host "Skipping OpenSSL - building PJSIP without SSL support"
+          Add-Content openssl_dir.txt ""
+          Write-Host "OpenSSL disabled - PJSIP will build without SSL features"
+        shell: powershell
+
+      - name: verify openssl skip
+        run: |
+          Write-Host "OpenSSL verification: SSL support disabled"
+          if (Test-Path "openssl_dir.txt") {
+            $content = Get-Content "openssl_dir.txt"
+            Write-Host "OpenSSL dir content: '$content'"
+          }
+        shell: powershell
+
+      - name: skip libvpx (build without VP8/VP9)
+        run: |
+          Write-Host "Skipping libvpx - building PJSIP without VP8/VP9 codec support"
+          Add-Content libvpx_dir.txt ""
+          Write-Host "libvpx disabled - PJSIP will build without VP8/VP9 codecs"
+        shell: powershell
+
+      - name: skip SDL (build without SDL video)
+        run: |
+          Write-Host "Skipping SDL - building PJSIP without SDL video support"
+          Add-Content libsdl_dir.txt ""
+          Write-Host "SDL disabled - PJSIP will build without SDL video"
+        shell: powershell
+
+      - name: Verify PJSIP directory structure
+        run: |
+          Write-Host "Checking if PJSIP directory exists..."
+          Write-Host "Current directory contents:"
+          dir
+          Write-Host "Checking for PJSIP root directory..."
+          $rootDir = $env:CORRECT_ROOT_DIR
+          if ($rootDir -and (Test-Path $rootDir)) {
+            Write-Host "PJSIP root directory found: $rootDir"
+            dir $rootDir
+            Write-Host "Checking for pjlib directory inside PJSIP..."
+            if (Test-Path "$rootDir/pjlib") {
+              Write-Host "pjlib directory found"
+              dir "$rootDir/pjlib"
+            } else {
+              Write-Host "pjlib directory not found"
+            }
+          } else {
+            Write-Host "PJSIP root directory not found or not set"
+            Write-Host "CORRECT_ROOT_DIR = $rootDir"
+          }
+        shell: powershell
+
+      - name: config site (minimal build - no SSL)
+        run: |
+          Write-Host "Current working directory:"
+          pwd
+          Write-Host "Using PJSIP root directory: ${{ env.CORRECT_ROOT_DIR }}"
+          Write-Host "Checking for pjlib directory..."
+          Write-Host "Available directories:"
+          dir
+          Write-Host "Checking for pjlib/include/pj..."
+          $pjlibPath = "${{ env.CORRECT_ROOT_DIR }}/pjlib/include/pj"
+          Write-Host "Looking for pjlib at: $pjlibPath"
+          if (Test-Path $pjlibPath) {
+            Write-Host "pjlib/include/pj found"
+            cd $pjlibPath
+            if (Test-Path "config_site_test.h") {
+              cp config_site_test.h config_site.h
+              Write-Host "config_site.h created from config_site_test.h"
+            } else {
+              Write-Host "config_site_test.h not found, creating empty config_site.h"
+              New-Item -ItemType File -Name "config_site.h" -Force
+            }
+            Write-Host "Configuring PJSIP for minimal build (audio only, no SSL/SRTP)"
+            Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+            Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+            Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+            Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+            Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+            Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+            Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+            Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+          } else {
+            Write-Host "pjlib/include/pj not found - checking if we need to create the structure"
+            Write-Host "Checking if pjlib exists..."
+            if (Test-Path "pjlib") {
+              Write-Host "pjlib found, checking include directory..."
+              dir pjlib
+              if (Test-Path "pjlib/include") {
+                Write-Host "pjlib/include found, checking pj directory..."
+                dir pjlib/include
+                if (Test-Path "pjlib/include/pj") {
+                  Write-Host "pjlib/include/pj found after detailed check"
+                  cd pjlib/include/pj
+                  New-Item -ItemType File -Name "config_site.h" -Force
+                  Write-Host "Created config_site.h"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+                  Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+                  Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+                } else {
+                  Write-Host "pjlib/include/pj not found - creating it"
+                  New-Item -ItemType Directory -Path "pjlib/include/pj" -Force
+                  cd pjlib/include/pj
+                  New-Item -ItemType File -Name "config_site.h" -Force
+                  Write-Host "Created config_site.h"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+                  Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+                  Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+                  Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+                  Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+                }
+              } else {
+                Write-Host "pjlib/include not found - creating full structure"
+                New-Item -ItemType Directory -Path "pjlib/include/pj" -Force
+                cd pjlib/include/pj
+                New-Item -ItemType File -Name "config_site.h" -Force
+                Write-Host "Created config_site.h"
+                Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+                Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+                Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+                Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+                Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+                Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+                Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+                Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+              }
+            } else {
+              Write-Host "pjlib not found - creating full structure"
+              New-Item -ItemType Directory -Path "pjlib/include/pj" -Force
+              cd pjlib/include/pj
+              New-Item -ItemType File -Name "config_site.h" -Force
+              Write-Host "Created config_site.h"
+              Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 0"
+              Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 0"
+              Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 0"
+              Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_SRTP 0"
+              Add-Content config_site.h "#define PJMEDIA_HAS_DTLS_SRTP 0"
+              Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_DTLS 0"
+              Add-Content config_site.h "#define PJMEDIA_TRANSPORT_HAS_SRTP 0"
+              Write-Host "PJSIP configured for audio-only build (no SSL/SRTP)"
+            }
+          }
+        shell: powershell
+        working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
+
+      - name: check Visual Studio tools
+        run: |
+          echo "Checking for Visual Studio 2022 Enterprise..."
+          if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            echo "Found vcvars64.bat for x64 architecture"
+          ) else (
+            echo "vcvars64.bat not found, checking for Community edition..."
+            if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
+              echo "Found vcvars64.bat in Community edition"
+            ) else (
+              echo "ERROR: vcvars64.bat not found in either Enterprise or Community edition"
+              exit /b 1
+            )
+          )
+        shell: cmd
+
+      - name: Clean previous builds
+        working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
+        run: |
+          echo "Setting up Visual Studio environment for x64..."
+          if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          ) else (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          )
+          echo "Cleaning previous build artifacts manually"
+          if exist "lib" rmdir /s /q "lib"
+          if exist "bin" rmdir /s /q "bin"
+          if exist "pjlib\lib" rmdir /s /q "pjlib\lib"
+          if exist "pjlib-util\lib" rmdir /s /q "pjlib-util\lib"
+          if exist "pjmedia\lib" rmdir /s /q "pjmedia\lib"
+          if exist "pjnath\lib" rmdir /s /q "pjnath\lib"
+          if exist "pjsip\lib" rmdir /s /q "pjsip\lib"
+          if exist "pjsip-apps\bin" rmdir /s /q "pjsip-apps\bin"
+          echo "Manual clean completed"
+        shell: cmd
+
+      - name: Build PJSIP libraries
+        working-directory: ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}
+        run: |
+          echo "Setting up Visual Studio environment for x64..."
+          if exist "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          ) else (
+            call "%PROGRAMFILES%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          )
+          echo "Building PJSIP libraries for Node.js addon..."
+          echo "Current directory:"
+          cd
+          echo "Available files:"
+          dir
+          
+          echo "Verifying build tools availability..."
+          where cl
+          if errorlevel 1 (
+            echo "ERROR: cl compiler not found in PATH"
+            exit /b 1
+          )
+          where nmake
+          if errorlevel 1 (
+            echo "ERROR: nmake not found in PATH"
+            exit /b 1
+          )
+          
+          echo "Checking for Visual Studio project files..."
+          echo "Looking for .vcxproj files in pjlib directory:"
+          dir pjlib\*.vcxproj
+          if exist "pjlib\pjlib.vcxproj" (
+            echo "pjlib.vcxproj found"
+          ) else (
+            echo "pjlib.vcxproj not found, checking for other project files..."
+            echo "All .vcxproj files in pjlib:"
+            dir pjlib\*.vcxproj /s
+            echo "All .vcxproj files in current directory:"
+            dir *.vcxproj /s
+            echo "Looking for solution files:"
+          dir *.sln
+            echo "Checking if we should use solution files instead..."
+            if exist "pjproject-vs14.sln" (
+              echo "Found pjproject-vs14.sln - will use solution file for building"
+            ) else (
+              echo "ERROR: No suitable project files found"
+              exit /b 1
+            )
+          )
+          
+          echo "Building PJSIP core libraries..."
+          if exist "pjproject-vs14.sln" (
+            echo "Building using Visual Studio solution file..."
+            echo "Cleaning previous build artifacts..."
+            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /t:Clean /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            echo "Building PJSIP solution for x64..."
+            msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64 /p:TargetArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build PJSIP solution"
+              echo "Trying alternative build approach..."
+              msbuild pjproject-vs14.sln /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+              if errorlevel 1 (
+                echo "ERROR: Alternative build also failed"
+                exit /b %errorlevel%
+              )
+            )
+          ) else (
+            echo "Building individual projects..."
+            echo "Building pjlib..."
+            msbuild pjlib\pjlib.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build pjlib"
+              exit /b %errorlevel%
+            )
+            
+            echo "Building pjlib-util..."
+            msbuild pjlib-util\pjlib-util.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build pjlib-util"
+              exit /b %errorlevel%
+            )
+            
+            echo "Building pjmedia..."
+            msbuild pjmedia\pjmedia.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build pjmedia"
+              exit /b %errorlevel%
+            )
+            
+            echo "Building pjnath..."
+            msbuild pjnath\pjnath.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build pjnath"
+              exit /b %errorlevel%
+            )
+            
+            echo "Building pjsip..."
+            msbuild pjsip\pjsip.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build pjsip"
+              exit /b %errorlevel%
+            )
+            
+            echo "Building pjsua..."
+            msbuild pjsip-apps\pjsua\pjsua.vcxproj /p:PlatformToolset=v143 /p:Configuration=Release /p:Platform=x64 /p:UseEnv=true /verbosity:minimal /p:PlatformTarget=x64 /p:PreferredToolArchitecture=x64
+            if errorlevel 1 (
+              echo "ERROR: Failed to build pjsua"
+              exit /b %errorlevel%
+            )
+          )
+          
+          echo "PJSIP libraries built successfully"
+          echo "Checking for generated libraries..."
+          echo "Current directory contents after build:"
+          dir
+          echo "Looking for lib directory..."
+          if exist "lib" (
+            echo "lib directory found"
+            dir lib\*.lib
+            if errorlevel 1 (
+              echo "ERROR: No .lib files found in lib directory"
+              echo "Contents of lib directory:"
+              dir lib
+              exit /b 1
+            )
+          ) else (
+            echo "lib directory not found, checking for alternative output directories..."
+            echo "Looking for build directories:"
+            dir /s *.lib
+            echo "Creating lib directory and copying any found libraries..."
+            mkdir lib
+            for /r %%f in (*.lib) do (
+              echo "Found library: %%f"
+              copy "%%f" lib\
+            )
+            dir lib\*.lib
+            if errorlevel 1 (
+              echo "ERROR: Still no .lib files found after search"
+              exit /b 1
+            )
+          )
+          
+          echo "PJSIP library build completed successfully"
+        shell: cmd
+
+      - name: skip test tools (minimal build)
+        run: |
+          Write-Host "Skipping test tools build for minimal configuration"
+        shell: powershell
+
+      - name: skip tests (minimal build)
+        run: |
+          Write-Host "Skipping PJSIP tests for minimal build"
+          Write-Host "Build completed successfully without tests"
+        shell: powershell
+
+      - name: Prepare PJSIP bundle
+        run: |
+          mkdir pjsip-bundle
+          mkdir pjsip-bundle\lib
+          mkdir pjsip-bundle\include
+          echo "Copying header files..."
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjlib\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjlib\include pjsip-bundle\include\pjlib
+          ) else (
+            echo "WARNING: pjlib\include not found"
+          )
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjsip\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjsip\include pjsip-bundle\include\pjsip
+          ) else (
+            echo "WARNING: pjsip\include not found"
+          )
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjnath\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjnath\include pjsip-bundle\include\pjnath
+          ) else (
+            echo "WARNING: pjnath\include not found"
+          )
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjmedia\include" (
+            xcopy /Y /I ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\pjmedia\include pjsip-bundle\include\pjmedia
+          ) else (
+            echo "WARNING: pjmedia\include not found"
+          )
+          echo "Copying library files..."
+          if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib\*.lib" (
+            xcopy /Y ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib\*.lib pjsip-bundle\lib\
+            echo "Library files copied successfully"
+            dir pjsip-bundle\lib\*.lib
+          ) else (
+            echo "WARNING: No .lib files found in ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib"
+            echo "Available files in ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib:"
+            if exist "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib" (
+              dir ${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}\lib
+            ) else (
+              echo "lib directory does not exist"
+            )
+          )
+        shell: cmd
+
+      - name: Zip PJSIP bundle
+        run: |
+          powershell -Command "Compress-Archive -Path .\pjsip-bundle\* -DestinationPath .\pjsip-windows.x64.zip -Force"
+          Write-Host "PJSIP bundle zipped successfully"
+
+      - name: Build Node addon
+        run: |
+          # Install dependencies
+          npm ci
+
+          # Collect and organize PJSIP libraries for Node addon build
+          Write-Host "Organizing PJSIP libraries for Node addon build..."
+          $rootDir = "${{ env.CORRECT_ROOT_DIR || format('pjproject-{0}', env.SRC_VERSION) }}"
+          Write-Host "Using PJSIP root directory: $rootDir"
+
+          # Ensure centralized lib directory exists
+          $centralLibDir = "$rootDir\lib"
+          if (-not (Test-Path $centralLibDir)) {
+            Write-Host "Creating centralized lib directory: $centralLibDir"
+            New-Item -ItemType Directory -Path $centralLibDir -Force
+          }
+
+          # Define search paths for libraries (matching GitHub Actions structure)
+          $searchPaths = @(
+            "$rootDir\lib",
+            "$rootDir\pjlib\lib",
+            "$rootDir\pjlib-util\lib",
+            "$rootDir\pjmedia\lib",
+            "$rootDir\pjnath\lib",
+            "$rootDir\pjsip\lib",
+            "$rootDir\third_party\lib"
+          )
+
+          Write-Host "Searching for .lib files in multiple directories..."
+          $allLibFiles = @()
+          foreach ($searchPath in $searchPaths) {
+            if (Test-Path $searchPath) {
+              $libFiles = Get-ChildItem -Path $searchPath -Filter "*.lib"
+              if ($libFiles.Count -gt 0) {
+                Write-Host "Found $($libFiles.Count) libraries in: $searchPath"
+                $libFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+                $allLibFiles += $libFiles
+              }
+            }
+          }
+
+          if ($allLibFiles.Count -gt 0) {
+            Write-Host "`nTotal found: $($allLibFiles.Count) .lib files"
+
+            # Copy all libraries to centralized location, avoiding self-copy
+            $copiedCount = 0
+            foreach ($lib in $allLibFiles) {
+              $destPath = "$centralLibDir\$($lib.Name)"
+
+              # Check if source and destination are different
+              $sourcePath = [System.IO.Path]::GetFullPath($lib.FullName)
+              $destFullPath = [System.IO.Path]::GetFullPath($destPath)
+
+              if ($sourcePath -ne $destFullPath) {
+                try {
+                  Copy-Item -Path $sourcePath -Destination $centralLibDir -Force -ErrorAction Stop
+                  $copiedCount++
+                  Write-Host "✓ Copied: $($lib.Name)"
+                } catch {
+                  Write-Host "⚠ Warning: Could not copy $($lib.Name): $($_.Exception.Message)"
+                }
+              } else {
+                Write-Host "✓ Already in place: $($lib.Name)"
+              }
+            }
+            Write-Host "`n✅ Library organization complete: $copiedCount files copied"
+          } else {
+            Write-Host "❌ ERROR: No .lib files found in any search path"
+            Write-Host "Available paths checked:"
+            $searchPaths | ForEach-Object {
+              $exists = if (Test-Path $_) { "✓" } else { "✗" }
+              Write-Host "  $exists $_"
+            }
+            exit 1
+          }
+
+          # Verify we have critical PJSIP libraries
+          $coreLibs = @(
+            "pjsua2-lib-x86_64-x64-vc14-Release.lib",
+            "pjsua-lib-x86_64-x64-vc14-Release.lib",
+            "pjsip-core-x86_64-x64-vc14-Release.lib",
+            "pjlib-x86_64-x64-vc14-Release.lib"
+          )
+
+          $missingCoreLibs = @()
+          foreach ($coreLib in $coreLibs) {
+            if (-not (Test-Path "$centralLibDir\$coreLib")) {
+              $missingCoreLibs += $coreLib
+            }
+          }
+
+          if ($missingCoreLibs.Count -gt 0) {
+            Write-Host "❌ ERROR: Missing critical PJSIP libraries:"
+            $missingCoreLibs | ForEach-Object { Write-Host "  - $_" }
+            Write-Host "`nAvailable libraries in $centralLibDir:"
+            if (Test-Path $centralLibDir) {
+              Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  ✓ $($_.Name)" }
+            }
+            exit 1
+          } else {
+            Write-Host "✅ All critical PJSIP libraries found"
+            Write-Host "`nLibrary inventory ($centralLibDir):"
+            Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  ✓ $($_.Name)" }
+          }
+
+          Write-Host "Configuring Node.js addon build..."
+          npm run configure
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: node-gyp configure failed"
+            exit 1
+          }
+
+          Write-Host "Building Node.js addon..."
+          npm run build:native
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: node-gyp build failed"
+            exit 1
+          }
+
+          Write-Host "✅ SUCCESS: Node addon build completed successfully"
+
+          # Verify the addon was built successfully
+          if (Test-Path "build\Release\node_pjsip.node") {
+            $addonFile = Get-Item "build\Release\node_pjsip.node"
+            Write-Host "✅ SUCCESS: Node addon created successfully!"
+            Write-Host "   📁 File: build\Release\node_pjsip.node"
+            Write-Host "   📊 Size: $([math]::Round($addonFile.Length / 1MB, 2)) MB ($($addonFile.Length) bytes)"
+
+            # Test that the addon loads
+            try {
+              $testResult = node -e "const addon = require('./build/Release/node_pjsip.node'); console.log('Exports: ' + Object.keys(addon).length + ' functions');"
+              Write-Host "   🧪 Load test: PASSED - $testResult"
+            } catch {
+              Write-Host "   ⚠️ Load test: FAILED - $($_.Exception.Message)"
+            }
+          } else {
+            Write-Host "❌ ERROR: Node addon file not found at build\Release\node_pjsip.node"
+            Write-Host "Build directory contents:"
+            if (Test-Path "build\Release") {
+              Get-ChildItem "build\Release" | Select-Object Name, Length
+            } else {
+              Write-Host "  build\Release directory does not exist"
+            }
+            exit 1
+          }
+        shell: powershell
+
+      - name: Upload all artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pjsip-node-windows-x64
+          path: |
+            build/Release/*.node
+            dist/**
+            pjsip-windows.x64.zip
+          if-no-files-found: error
