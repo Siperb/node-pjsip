@@ -47,9 +47,9 @@ jobs:
           foreach ($tool in $tools) {
             $toolPath = Get-Command $tool -ErrorAction SilentlyContinue
             if ($toolPath) {
-              Write-Host "✓ $tool found at: $($toolPath.Source)"
+              Write-Host "SUCCESS: $tool found at: $($toolPath.Source)"
             } else {
-              Write-Host "✗ $tool not found in PATH"
+              Write-Host "ERROR: $tool not found in PATH"
               exit 1
             }
           }
