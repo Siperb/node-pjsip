@@ -666,7 +666,7 @@ jobs:
             Write-Host "Available libraries:"
             Get-ChildItem "$libDir\*.lib" | ForEach-Object { Write-Host "  $($_.Name)" }
           } else {
-            Write-Host "✓ All required PJSIP libraries found"
+            Write-Host "SUCCESS: All required PJSIP libraries found"
           }
 
           Write-Host "Configuring Node.js addon build..."
@@ -683,11 +683,11 @@ jobs:
             exit 1
           }
 
-          Write-Host "✓ Node addon build completed successfully"
+          Write-Host "SUCCESS: Node addon build completed successfully"
 
           # Verify the addon was built
           if (Test-Path "build\Release\node_pjsip.node") {
-            Write-Host "✓ Node addon successfully created: build\Release\node_pjsip.node"
+            Write-Host "SUCCESS: Node addon successfully created: build\Release\node_pjsip.node"
             $addonFile = Get-Item "build\Release\node_pjsip.node"
             Write-Host "  Size: $($addonFile.Length) bytes"
           } else {
