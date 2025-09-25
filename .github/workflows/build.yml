@@ -585,16 +585,30 @@ jobs:
             Write-Host "Found $($allLibFiles.Count) .lib files:"
             $allLibFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
             
-            # Copy all found .lib files to the lib directory
+            # Ensure lib directory exists
+            if (-not (Test-Path "$rootDir\lib")) {
+              New-Item -ItemType Directory -Path "$rootDir\lib" -Force
+            }
+            
+            # Copy all found .lib files to the lib directory (avoid copying to same location)
             $allLibFiles | ForEach-Object {
-              Copy-Item -Path $_.FullName -Destination "$rootDir\lib\" -Force
-              Write-Host "Copied: $($_.Name)"
+              $destPath = "$rootDir\lib\$($_.Name)"
+              if ($_.FullName -ne $destPath) {
+                Copy-Item -Path $_.FullName -Destination "$rootDir\lib\" -Force
+                Write-Host "Copied: $($_.Name)"
+              } else {
+                Write-Host "Skipping: $($_.Name) (already in correct location)"
+              }
             }
             
             # Now copy to current directory for node-gyp
-            Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
-            Write-Host "PJSIP libraries copied to current directory:"
-            Get-ChildItem "*.lib" | Select-Object Name, Length
+            if (Test-Path "$rootDir\lib\*.lib") {
+              Copy-Item -Path "$rootDir\lib\*.lib" -Destination "." -Force
+              Write-Host "PJSIP libraries copied to current directory:"
+              Get-ChildItem "*.lib" | Select-Object Name, Length
+            } else {
+              Write-Host "No .lib files found in $rootDir\lib"
+            }
           } else {
             Write-Host "No .lib files found, but found .obj files. Creating libraries from object files..."
             
