@@ -26,19 +26,23 @@ jobs:
       - name: Setup Visual Studio environment
         run: |
           # Import the VS environment for x64 architecture
-          $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          $vsEnterprisePath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          $vsCommunityPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          $vsPath = if (Test-Path $vsEnterprisePath) { $vsEnterprisePath } elseif (Test-Path $vsCommunityPath) { $vsCommunityPath } else { $null }
+
           if (Test-Path $vsPath) {
-            Write-Host "Setting up Visual Studio 2022 Enterprise x64 environment"
+            Write-Host "Setting up Visual Studio 2022 x64 environment from: $vsPath"
             cmd /c "`"$vsPath`" && set" | ForEach-Object {
               if ($_ -match "^([^=]+)=(.*)$") {
                 [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+                # Also update the current session's PATH
                 if ($matches[1] -eq "PATH") {
                   $env:PATH = $matches[2]
                 }
               }
             }
           } else {
-            Write-Host "ERROR: Visual Studio 2022 Enterprise vcvars64.bat not found"
+            Write-Host "ERROR: Visual Studio 2022 vcvars64.bat not found in Enterprise or Community paths."
             exit 1
           }
 
@@ -659,12 +663,12 @@ jobs:
                 try {
                   Copy-Item -Path $sourcePath -Destination $centralLibDir -Force -ErrorAction Stop
                   $copiedCount++
-                  Write-Host "[OK] Copied: $($lib.Name)"
+                  Write-Host "[Copied] $($lib.Name)"
                 } catch {
-                  Write-Host "[WARNING] Could not copy $($lib.Name): $($_.Exception.Message)"
+                  Write-Host "[Warning] Could not copy $($lib.Name): $($_.Exception.Message)"
                 }
               } else {
-                Write-Host "[OK] Already in place: $($lib.Name)"
+                Write-Host "[Skipped] Already in place: $($lib.Name)"
               }
             }
             Write-Host "`n[SUCCESS] Library organization complete: $copiedCount files copied"
@@ -672,7 +676,7 @@ jobs:
             Write-Host "[ERROR] No .lib files found in any search path"
             Write-Host "Available paths checked:"
             $searchPaths | ForEach-Object {
-              $exists = if (Test-Path $_) { "[OK]" } else { "[MISSING]" }
+              $exists = if (Test-Path $_) { "[Found]" } else { "[Missing]" }
               Write-Host "  $exists $_"
             }
             exit 1
@@ -696,15 +700,15 @@ jobs:
           if ($missingCoreLibs.Count -gt 0) {
             Write-Host "[ERROR] Missing critical PJSIP libraries:"
             $missingCoreLibs | ForEach-Object { Write-Host "  - $_" }
-            Write-Host "`nAvailable libraries in $centralLibDir:"
+            Write-Host "`nAvailable libraries in ${centralLibDir}:"
             if (Test-Path $centralLibDir) {
-              Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  [OK] $($_.Name)" }
+              Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  - $($_.Name)" }
             }
             exit 1
           } else {
             Write-Host "[SUCCESS] All critical PJSIP libraries found"
-            Write-Host "`nLibrary inventory ($centralLibDir):"
-            Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  [OK] $($_.Name)" }
+            Write-Host "`nLibrary inventory (${centralLibDir}):"
+            Get-ChildItem "$centralLibDir\*.lib" | ForEach-Object { Write-Host "  - $($_.Name)" }
           }
 
           Write-Host "Configuring Node.js addon build..."
@@ -721,21 +725,21 @@ jobs:
             exit 1
           }
 
-          Write-Host "[SUCCESS] Node addon build completed successfully"
+          Write-Host "`n[SUCCESS] Node addon build command completed."
 
           # Verify the addon was built successfully
           if (Test-Path "build\Release\node_pjsip.node") {
             $addonFile = Get-Item "build\Release\node_pjsip.node"
             Write-Host "[SUCCESS] Node addon created successfully!"
-            Write-Host "   File: build\Release\node_pjsip.node"
-            Write-Host "   Size: $([math]::Round($addonFile.Length / 1MB, 2)) MB ($($addonFile.Length) bytes)"
+            Write-Host "   - File: build\Release\node_pjsip.node"
+            Write-Host "   - Size: $([math]::Round($addonFile.Length / 1MB, 2)) MB ($($addonFile.Length.ToString()) bytes)"
 
             # Test that the addon loads
             try {
-              $testResult = node -e "const addon = require('./build/Release/node_pjsip.node'); console.log('Exports: ' + Object.keys(addon).length + ' functions');"
-              Write-Host "   Load test: PASSED - $testResult"
+              $testResult = node -e "const addon = require('./build/Release/node_pjsip.node'); console.log('Addon loaded. Exports: ' + Object.keys(addon).length);"
+              Write-Host "   - Load test: PASSED - $testResult"
             } catch {
-              Write-Host "   Load test: FAILED - $($_.Exception.Message)"
+              Write-Host "   - Load test: FAILED - $($_.Exception.Message)"
             }
           } else {
             Write-Host "[ERROR] Node addon file not found at build\Release\node_pjsip.node"
