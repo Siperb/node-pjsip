@@ -2,19 +2,16 @@
   "name": "pjsip-node",
   "version": "1.0.0",
   "description": "PJSIP wrapper for Node.js - Similar to baresip-node",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "lib/index.js",
   "scripts": {
-    "build": "npm run build:native && npm run build:js",
+    "build": "npm run build:native",
     "build:native": "node-gyp rebuild --arch=x64",
-    "build:js": "tsc",
-    "test": "node dist/test.js",
-    "example": "node dist/example.js",
-    "clean": "rimraf build dist",
+    "test": "node test.js",
+    "clean": "rimraf build",
     "prebuild": "npm run clean && node -e \"require('fs').mkdirSync('build',{recursive:true})\"",
     "configure": "node-gyp configure --arch=x64",
     "install": "npm run build",
-    "start": "node dist/test.js"
+    "start": "node test.js"
   },
   "keywords": [
     "pjsip",
@@ -32,17 +29,19 @@
     "node-addon-api": "^8.5.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "rimraf": "^5.0.0",
-    "typescript": "^5.0.0"
+    "rimraf": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "files": [
-    "dist/",
     "build/Release/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "binding.gyp",
+    "src/",
+    "pjproject-2.15.1/",
+    "*.lib",
+    "lib/"
   ]
 }

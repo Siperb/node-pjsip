@@ -28,6 +28,7 @@ public:
     std::string password;
     std::string proxy;
     bool is_registered;
+    bool is_unregistering;
     pjsua_acc_info acc_info;
     
     PJSIPAccount();
@@ -56,6 +57,13 @@ private:
     std::function<void(const std::string&)> on_unregistered;
     std::function<void(const std::string&)> on_incoming_call;
     std::function<void(const std::string&)> on_call_state;
+
+    // N-API Thread-safe functions
+    Napi::ThreadSafeFunction on_registered_tsfn;
+    Napi::ThreadSafeFunction on_register_failed_tsfn;
+    Napi::ThreadSafeFunction on_unregistered_tsfn;
+    Napi::ThreadSafeFunction on_incoming_call_tsfn;
+    Napi::ThreadSafeFunction on_call_state_tsfn;
     
 public:
     PJSIPWrapper();
@@ -64,26 +72,19 @@ public:
     static PJSIPWrapper* getInstance();
     
     // Core functions - Real PJSIP API
-    bool initialize();
+    bool initialize(const Napi::Object& config);
     bool shutdown();
     
     // Account management - Real PJSIP API
-    int addAccount(const std::string& aor, const std::string& registrar, 
-                   const std::string& username, const std::string& password,
-                   const std::string& proxy = "");
-    bool removeAccount(int acc_id);
+    int registerAccount(const Napi::Object& config);
+    bool unregisterAccount(int acc_id);
     PJSIPAccount* getAccount(int acc_id);
     std::vector<PJSIPAccount*> getAllAccounts();
     
-    // Registration - Real PJSIP API
-    bool registerAccount(int acc_id);
-    bool unregisterAccount(int acc_id);
-    bool refreshRegistration(int acc_id);
-    
-    // Call management - Real PJSIP API
-    bool makeCall(int acc_id, const std::string& uri);
-    bool answerCall(int call_id);
-    bool hangupCall(int call_id);
+    // Session management - Real PJSIP API
+    int invite(const Napi::Object& config);
+    bool answer(int call_id);
+    bool hangup(int call_id);
     
     // Event handlers - Real PJSIP API
     void setOnRegistered(std::function<void(const std::string&)> callback);
@@ -91,6 +92,13 @@ public:
     void setOnUnregistered(std::function<void(const std::string&)> callback);
     void setOnIncomingCall(std::function<void(const std::string&)> callback);
     void setOnCallState(std::function<void(const std::string&)> callback);
+
+    // N-API Thread-safe functions
+    void setOnRegistered(const Napi::Function& callback);
+    void setOnRegisterFailed(const Napi::Function& callback);
+    void setOnUnregistered(const Napi::Function& callback);
+    void setOnIncomingCall(const Napi::Function& callback);
+    void setOnCallState(const Napi::Function& callback);
     
     // Utility functions
     std::string getVersion();
@@ -105,19 +113,59 @@ public:
 };
 
 // N-API function declarations
+// Core functions
 Napi::Value Init(const Napi::CallbackInfo& info);
-Napi::Value RegisterAccount(const Napi::CallbackInfo& info);
-Napi::Value UnregisterAccount(const Napi::CallbackInfo& info);
-Napi::Value GetAccountInfo(const Napi::CallbackInfo& info);
 Napi::Value Shutdown(const Napi::CallbackInfo& info);
-Napi::Value AddAccount(const Napi::CallbackInfo& info);
-Napi::Value RemoveAccount(const Napi::CallbackInfo& info);
-Napi::Value MakeCall(const Napi::CallbackInfo& info);
-Napi::Value AnswerCall(const Napi::CallbackInfo& info);
-Napi::Value HangupCall(const Napi::CallbackInfo& info);
+Napi::Value SetLogLevel(const Napi::CallbackInfo& info);
 Napi::Value GetVersion(const Napi::CallbackInfo& info);
+
+// Account / Registration functions
+Napi::Value Register(const Napi::CallbackInfo& info);
+Napi::Value Unregister(const Napi::CallbackInfo& info);
+Napi::Value GetRegistrationStatus(const Napi::CallbackInfo& info);
+
+// Call functions
+Napi::Value Invite(const Napi::CallbackInfo& info);
+Napi::Value Answer(const Napi::CallbackInfo& info);
+Napi::Value Reject(const Napi::CallbackInfo& info);
+Napi::Value Cancel(const Napi::CallbackInfo& info);
+Napi::Value Bye(const Napi::CallbackInfo& info);
+Napi::Value Hold(const Napi::CallbackInfo& info);
+Napi::Value Unhold(const Napi::CallbackInfo& info);
+Napi::Value Reinvite(const Napi::CallbackInfo& info);
+Napi::Value Update(const Napi::CallbackInfo& info);
+Napi::Value Mute(const Napi::CallbackInfo& info);
+Napi::Value Unmute(const Napi::CallbackInfo& info);
+Napi::Value Dtmf(const Napi::CallbackInfo& info);
+Napi::Value Info(const Napi::CallbackInfo& info);
+Napi::Value GetCallInfo(const Napi::CallbackInfo& info);
+Napi::Value GetMediaStats(const Napi::CallbackInfo& info);
+
+// Messaging & Presence functions
+Napi::Value SendMessage(const Napi::CallbackInfo& info);
+Napi::Value Subscribe(const Napi::CallbackInfo& info);
+Napi::Value Unsubscribe(const Napi::CallbackInfo& info);
+Napi::Value Publish(const Napi::CallbackInfo& info);
+
+// Conference / Utility functions
+Napi::Value Conference(const Napi::CallbackInfo& info);
+Napi::Value ListTransports(const Napi::CallbackInfo& info);
+Napi::Value ListCalls(const Napi::CallbackInfo& info);
+Napi::Value SetCodecPriority(const Napi::CallbackInfo& info);
+
+// Transport & Network functions
+Napi::Value CreateTransport(const Napi::CallbackInfo& info);
+Napi::Value SetOutboundProxy(const Napi::CallbackInfo& info);
+Napi::Value SetDnsServers(const Napi::CallbackInfo& info);
+Napi::Value SetStunServers(const Napi::CallbackInfo& info);
+Napi::Value SetTurnServers(const Napi::CallbackInfo& info);
+
+// Additional utility functions
 Napi::Value GetLocalIP(const Napi::CallbackInfo& info);
 Napi::Value GetBoundPort(const Napi::CallbackInfo& info);
+
+// Event callback system
+Napi::Value SetEventCallback(const Napi::CallbackInfo& info);
 
 // Export bindings to Node.js
 Napi::Object InitPjsipWrapper(Napi::Env env, Napi::Object exports);

@@ -1,0 +1,38 @@
+# Development files
+node_modules/
+.git/
+.gitignore
+*.log
+*.tmp
+*.temp
+
+# Build artifacts (but keep Release folder)
+build/Debug/
+build/obj/
+build/*.sln
+build/*.vcxproj*
+build/config.gypi
+
+# Test files
+test.js
+test.cpp
+test_github_actions.ps1
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep these important files:
+# - All .lib files (PJSIP libraries)
+# - pjproject-2.15.1/ (PJSIP source and headers)
+# - src/ (Source code)
+# - dist/ (Compiled JavaScript)
+# - build/Release/ (Compiled native addon)
+# - binding.gyp (Build configuration)
+# - package.json (Package metadata)
