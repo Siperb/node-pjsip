@@ -1,111 +1,112 @@
-const PJSIP = require('./lib');
+const api = require('./lib');
 
-// Create PJSIP instance
-const pjsip = new PJSIP.PJSIP();
+// Test the new JavaScript wrapper with client's required API structure
+console.log('🚀 Testing PJSIP JavaScript Wrapper (Client Requirements)');
 
-// Real SIP configuration - Replace with your actual SIP details
-const sipConfig = {
-    aor: "sip:1113@pbx.sheerbit.com",           // Your SIP address
-    registrar: "sip:pbx.sheerbit.com:5060",        // Your registrar server
-    username: "1113",                     // Your SIP username
-    password: "JJ5iYgLcermrMu",                     // Your SIP password
-    proxy: "sip:devproxy.celloip.com"                                      // Optional proxy server
-};
-
-// Event handlers
-pjsip.on('initialized', (data) => {
-    console.log('✅ PJSIP initialized:', data);
-    
-    // Add account after initialization
-    try {
-        const accountId = pjsip.addAccount(sipConfig);
-        
-        console.log('✅ Account added with ID:', accountId);
-        
-        // Register the account
-        pjsip.registerAccount(accountId);
-        
-    } catch (error) {
-        console.error('❌ Error adding account:', error.message);
-    }
+// Set up callbacks using the client's single-assignment callback system
+api.setCallbacks({
+  onReady: () => console.log('✅ PJSIP Ready'),
+  onError: (e) => console.error('❌ PJSIP Error:', e),
+  onRegisterStart: (e) => console.log('📝 Registration started:', e),
+  onRegisterSuccess: (e) => console.log('✅ Registration successful:', e),
+  onRegisterFailed: (e) => console.log('❌ Registration failed:', e),
+  onInvite: (e) => console.log('📞 Incoming INVITE:', e),
+  onConnected: (e) => console.log('🎉 Call connected:', e),
+  onBye: (e) => console.log('📴 Call ended:', e),
 });
 
-pjsip.on('accountAdded', (data) => {
-    console.log('✅ Account added:', data);
+// Test initialization
+console.log('🔧 Initializing PJSIP...');
+const initResult = api.Init({ 
+  logLevel: 4,
+  localPort: 5060,
+  transport: 'UDP',
+  userAgent: 'PJSIP Node.js Wrapper',
+  maxCalls: 10
 });
 
-pjsip.on('registrationStarted', (data) => {
-    console.log('🔄 Registration started for account:', data.accountId);
+if (!initResult.ok) {
+  console.error('❌ Initialization failed:', initResult.message);
+  process.exit(1);
+}
+
+console.log('✅ Initialization successful:', initResult.data);
+
+// Test account registration
+console.log('📝 Registering account...');
+const registerResult = api.Register({
+  username: "1113",
+  password: "JJ5iYgLcermrMu",
+  domain: "pbx.sheerbit.com",
+  registrar: "sip:pbx.sheerbit.com:5060",
+  displayName: "Test User",
+  expires: 3600
 });
 
-// Add registration success/failure handlers
-pjsip.on('registered', (aor) => {
-    console.log('✅ Registration successful for:', aor);
-});
+if (!registerResult.ok) {
+  console.error('❌ Registration failed:', registerResult.message);
+  process.exit(1);
+}
 
-pjsip.on('registerFailed', (aor) => {
-    console.log('❌ Registration failed for:', aor);
-});
+console.log('✅ Account registered with ID:', registerResult.data);
 
-pjsip.on('unregistered', (aor) => {
-    console.log('📤 Unregistered:', aor);
-});
-
-pjsip.on('error', (error) => {
-    console.error('❌ PJSIP Error:', error);
-});
-
-// Initialize PJSIP
-console.log('🚀 Initializing PJSIP...');
-pjsip.init().then((result) => {
-    console.log('✅ Initialization result:', result);
-}).catch((error) => {
-    console.error('❌ Initialization failed:', error);
-});
-
-// Keep the process running to see registration events
+// Wait a bit for registration to complete
 setTimeout(() => {
-    console.log('\n📊 Current accounts:');
-    const accounts = pjsip.getAccounts();
-    accounts.forEach(account => {
-        console.log(`  Account ${account.id}: ${account.aor} (Registered: ${account.isRegistered})`);
-    });
-    
-    // Get detailed account info
-    if (accounts.length > 0) {
-        const accountId = accounts[0].id;
-        try {
-            const info = pjsip.getAccountInfo(accountId);
-            console.log('\n📋 Account details:', info);
-        } catch (error) {
-            console.error('❌ Error getting account info:', error.message);
-        }
+  // Test making a call
+  console.log('📞 Making INVITE...');
+  const inviteResult = api.Invite({
+    to: "sip:8080@pbx.sheerbit.com",
+    withAudio: true,
+    withVideo: false,
+    timeout: 30
+  });
+
+  if (!inviteResult.ok) {
+    console.error('❌ INVITE failed:', inviteResult.message);
+  } else {
+    console.log('✅ INVITE sent with call ID:', inviteResult.data);
+  }
+
+  // Test other functions
+  console.log('🔍 Testing utility functions...');
+  
+  const versionResult = api.GetVersion();
+  console.log('📋 Version:', versionResult.ok ? versionResult.data : versionResult.message);
+  
+  const localIPResult = api.GetLocalIP();
+  console.log('🌐 Local IP:', localIPResult.ok ? localIPResult.data : localIPResult.message);
+  
+  const portResult = api.GetBoundPort();
+  console.log('🔌 Bound Port:', portResult.ok ? portResult.data : portResult.message);
+  
+  const regStatusResult = api.GetRegistrationStatus();
+  console.log('📊 Registration Status:', regStatusResult.ok ? regStatusResult.data : regStatusResult.message);
+
+  // Test diagnostics
+  console.log('🔧 Binding Info:', api.getBindingInfo());
+
+  // Clean shutdown after 10 seconds
+  setTimeout(() => {
+    console.log('🛑 Shutting down...');
+    const shutdownResult = api.Shutdown();
+    if (shutdownResult.ok) {
+      console.log('✅ Shutdown successful');
+    } else {
+      console.error('❌ Shutdown failed:', shutdownResult.message);
     }
+    process.exit(0);
+  }, 10000);
+
 }, 3000);
-
-// Graceful shutdown after 10 seconds
-setTimeout(() => {
-    console.log('\n🛑 Shutting down PJSIP...');
-    pjsip.shutdown().then((result) => {
-        console.log('✅ Shutdown result:', result);
-        process.exit(0);
-    }).catch((error) => {
-        console.error('❌ Shutdown failed:', error);
-        process.exit(1);
-    });
-}, 10000);
 
 // Handle process termination
 process.on('SIGINT', () => {
-    console.log('\n🛑 Received SIGINT, shutting down...');
-    pjsip.shutdown().then(() => {
-        process.exit(0);
-    });
-});
-
-process.on('SIGTERM', () => {
-    console.log('\n🛑 Received SIGTERM, shutting down...');
-    pjsip.shutdown().then(() => {
-        process.exit(0);
-    });
+  console.log('\n🛑 Received SIGINT, shutting down...');
+  const shutdownResult = api.Shutdown();
+  if (shutdownResult.ok) {
+    console.log('✅ Shutdown successful');
+  } else {
+    console.error('❌ Shutdown failed:', shutdownResult.message);
+  }
+  process.exit(0);
 });
